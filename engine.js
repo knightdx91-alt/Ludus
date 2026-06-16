@@ -1,0 +1,251 @@
+/* ludus/engine.js — pure Ludus rules. No DOM. Global: window.Ludus
+ *
+ * State is a plain JSON-serializable object (so it can sync over Firebase and
+ * be cloned for AI search):
+ *   { pieces:[ {id,type,color,board,r,c,moved} ], turn:'white'|'black',
+ *     winner:null|'white'|'black', moveCount:int }
+ * Action: { pieceId, type:'move'|'fly'|'attack', to:{board,r,c}, targets:[id...] }
+ *
+ * Boards: ground 11x11 (r,c in 0..10). sky 5x5 (r,c in 0..4) shadows ground
+ * (r+3,c+3) 1:1 — the central 5x5 (ground rows/cols 3..7).
+ */
+(function () {
+  'use strict';
+
+  var GROUND = 11, SKY = 5, SKY_OFF = 3;
+  // piece values for AI eval; FL is effectively infinite (king).
+  var VALUE = { L: 1, VL: 2, KF: 3, KT: 3, KI: 3, KA: 4, HL: 6, FL: 1000 };
+  var AERIAL = { KA: 1, HL: 1, FL: 1 };
+
+  function inGround(r, c) { return r >= 0 && r < GROUND && c >= 0 && c < GROUND; }
+  function inSky(r, c) { return r >= 0 && r < SKY && c >= 0 && c < SKY; }
+  function underSky(r, c) { return r >= SKY_OFF && r < SKY_OFF + SKY && c >= SKY_OFF && c < SKY_OFF + SKY; }
+  function groundToSky(r, c) { return { r: r - SKY_OFF, c: c - SKY_OFF }; }
+  function skyToGround(r, c) { return { r: r + SKY_OFF, c: c + SKY_OFF }; }
+
+  // white's "forward" is up (decreasing r); black's is down (increasing r).
+  function forward(color) { return color === 'white' ? -1 : 1; }
+  function backRank(color) { return color === 'white' ? 0 : GROUND - 1; } // promotion rank
+
+  function clone(state) { return JSON.parse(JSON.stringify(state)); }
+
+  function pieceAt(state, board, r, c) {
+    for (var i = 0; i < state.pieces.length; i++) {
+      var p = state.pieces[i];
+      if (p.board === board && p.r === r && p.c === c) return p;
+    }
+    return null;
+  }
+  function pieceById(state, id) {
+    for (var i = 0; i < state.pieces.length; i++) if (state.pieces[i].id === id) return state.pieces[i];
+    return null;
+  }
+
+  function initialState() {
+    var pieces = [], id = 0;
+    var back = ['KA', 'KT', 'KI', 'KF', 'HL', 'FL', 'HL', 'KF', 'KI', 'KT', 'KA'];
+    function add(type, color, r, c) { pieces.push({ id: 'p' + (id++), type: type, color: color, board: 'ground', r: r, c: c, moved: false }); }
+    // Black at top (rows 0,1), White at bottom (rows 10,9).
+    for (var c = 0; c < GROUND; c++) {
+      add(back[c], 'black', 0, c);
+      add('L', 'black', 1, c);
+      add('L', 'white', GROUND - 2, c);
+      add(back[c], 'white', GROUND - 1, c);
+    }
+    return { pieces: pieces, turn: 'white', winner: null, moveCount: 0 };
+  }
+
+  // ---- per-piece action generation -------------------------------------
+  // Each pusher returns nothing; appends actions to `out`.
+
+  function slide(state, p, dirs, maxSteps, out, opts) {
+    // ground sliding move/capture. opts.diagCaptureOnly etc not used here.
+    for (var d = 0; d < dirs.length; d++) {
+      var dr = dirs[d][0], dc = dirs[d][1];
+      for (var s = 1; s <= maxSteps; s++) {
+        var r = p.r + dr * s, c = p.c + dc * s;
+        if (!inGround(r, c)) break;
+        var occ = pieceAt(state, 'ground', r, c);
+        if (occ) {
+          if (occ.color !== p.color) out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: r, c: c }, targets: [occ.id] });
+          break; // blocked either way
+        }
+        out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: r, c: c }, targets: [] });
+      }
+    }
+  }
+
+  function rangedAttack(state, p, dirs, maxRange, out, pierce) {
+    // furycraft: hit first enemy along each dir within range (LOS blocked by anyone).
+    for (var d = 0; d < dirs.length; d++) {
+      var dr = dirs[d][0], dc = dirs[d][1];
+      for (var s = 1; s <= maxRange; s++) {
+        var r = p.r + dr * s, c = p.c + dc * s;
+        if (!inGround(r, c)) break;
+        var occ = pieceAt(state, 'ground', r, c);
+        if (!occ) continue;
+        if (occ.color === p.color) break; // own piece blocks
+        var targets = [occ.id];
+        if (pierce) {
+          var br = r + dr, bc = c + dc, behind = inGround(br, bc) ? pieceAt(state, 'ground', br, bc) : null;
+          if (behind && behind.color !== p.color) targets.push(behind.id);
+        }
+        out.push({ pieceId: p.id, type: 'attack', to: { board: 'ground', r: p.r, c: p.c }, targets: targets });
+        break; // first enemy hit
+      }
+    }
+  }
+
+  var DIAG = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+  var ORTHO = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+  var ALL8 = DIAG.concat(ORTHO);
+  var KNIGHT = [[-2, -1], [-2, 1], [2, -1], [2, 1], [-1, -2], [1, -2], [-1, 2], [1, 2]];
+
+  function legionnaireMoves(state, p, out) {
+    var f = forward(p.color);
+    // non-capture: forward, left, right (1); forward 2 if not moved
+    var steps = [[f, 0], [0, -1], [0, 1]];
+    for (var i = 0; i < steps.length; i++) {
+      var r = p.r + steps[i][0], c = p.c + steps[i][1];
+      if (inGround(r, c) && !pieceAt(state, 'ground', r, c)) addLegMove(state, p, r, c, out);
+    }
+    if (!p.moved) {
+      var r1 = p.r + f, r2 = p.r + 2 * f;
+      if (inGround(r2, p.c) && !pieceAt(state, 'ground', r1, p.c) && !pieceAt(state, 'ground', r2, p.c))
+        addLegMove(state, p, r2, p.c, out);
+    }
+    // capture: forward diagonals
+    var caps = [[f, -1], [f, 1]];
+    for (var k = 0; k < caps.length; k++) {
+      var cr = p.r + caps[k][0], cc = p.c + caps[k][1];
+      if (!inGround(cr, cc)) continue;
+      var occ = pieceAt(state, 'ground', cr, cc);
+      if (occ && occ.color !== p.color) addLegMove(state, p, cr, cc, out, [occ.id]);
+    }
+  }
+  function addLegMove(state, p, r, c, out, targets) {
+    out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: r, c: c }, targets: targets || [] });
+  }
+
+  function flyAndSkyMoves(state, p, out, skyStep) {
+    // fly up from a central ground square to its shadow sky square (if empty)
+    if (p.board === 'ground') {
+      if (underSky(p.r, p.c)) {
+        var s = groundToSky(p.r, p.c);
+        if (!pieceAt(state, 'sky', s.r, s.c)) out.push({ pieceId: p.id, type: 'fly', to: { board: 'sky', r: s.r, c: s.c }, targets: [] });
+      }
+    } else { // on sky: step 1 in any dir (sky), or descend to shadowed ground (move/capture)
+      for (var d = 0; d < ALL8.length; d++) {
+        var sr = p.r + ALL8[d][0], sc = p.c + ALL8[d][1];
+        if (inSky(sr, sc) && !pieceAt(state, 'sky', sr, sc)) out.push({ pieceId: p.id, type: 'fly', to: { board: 'sky', r: sr, c: sc }, targets: [] });
+      }
+      var g = skyToGround(p.r, p.c), occ = pieceAt(state, 'ground', g.r, g.c);
+      if (!occ) out.push({ pieceId: p.id, type: 'fly', to: { board: 'ground', r: g.r, c: g.c }, targets: [] });
+      else if (occ.color !== p.color) out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: g.r, c: g.c }, targets: [occ.id] });
+    }
+  }
+
+  function pieceActions(state, p, out) {
+    if (p.board === 'sky') { flyAndSkyMoves(state, p, out); return; }
+    switch (p.type) {
+      case 'L': legionnaireMoves(state, p, out); break;
+      case 'VL': slide(state, p, ALL8, 1, out); break;
+      case 'KF': slide(state, p, DIAG, 2, out); rangedAttack(state, p, DIAG, 2, out, false); break;
+      case 'KT':
+        for (var i = 0; i < KNIGHT.length; i++) {
+          var r = p.r + KNIGHT[i][0], c = p.c + KNIGHT[i][1];
+          if (!inGround(r, c)) continue;
+          var occ = pieceAt(state, 'ground', r, c);
+          if (!occ) out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: r, c: c }, targets: [] });
+          else if (occ.color !== p.color) out.push({ pieceId: p.id, type: 'move', to: { board: 'ground', r: r, c: c }, targets: [occ.id] });
+        }
+        rangedAttack(state, p, ORTHO, 1, out, true); break;
+      case 'KI': slide(state, p, ORTHO, 2, out); rangedAttack(state, p, ORTHO, 2, out, false); break;
+      case 'KA': slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out); break;
+      case 'HL':
+        slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out);
+        // High Lords wield all furycraft except Flora's: an orthogonal strike to
+        // range 2 (fire) that pierces the enemy directly behind the target (earth).
+        rangedAttack(state, p, ORTHO, 2, out, true);
+        break;
+      case 'FL': slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out); break;
+    }
+  }
+
+  function legalActions(state, color) {
+    color = color || state.turn;
+    if (state.winner) return [];
+    var out = [];
+    for (var i = 0; i < state.pieces.length; i++) {
+      var p = state.pieces[i];
+      if (p.color === color) pieceActions(state, p, out);
+    }
+    return out;
+  }
+
+  function applyAction(state, action) {
+    var ns = clone(state);
+    var p = pieceById(ns, action.pieceId);
+    if (!p) return ns;
+    var capturedFL = false;
+    if (action.targets && action.targets.length) {
+      for (var t = 0; t < action.targets.length; t++) {
+        var victim = pieceById(ns, action.targets[t]);
+        if (victim) { if (victim.type === 'FL') capturedFL = true; remove(ns, victim.id); }
+      }
+    }
+    if (action.type !== 'attack') {
+      p.board = action.to.board; p.r = action.to.r; p.c = action.to.c; p.moved = true;
+      // legionnaire promotion
+      if (p.type === 'L' && p.board === 'ground' && p.r === backRank(p.color)) p.type = 'VL';
+    }
+    ns.moveCount++;
+    if (capturedFL) ns.winner = p.color;
+    else if (!hasFirstLord(ns, opp(state.turn))) ns.winner = state.turn;
+    ns.turn = opp(state.turn);
+    return ns;
+  }
+
+  function remove(state, id) {
+    for (var i = 0; i < state.pieces.length; i++) if (state.pieces[i].id === id) { state.pieces.splice(i, 1); return; }
+  }
+  function opp(color) { return color === 'white' ? 'black' : 'white'; }
+  function hasFirstLord(state, color) {
+    for (var i = 0; i < state.pieces.length; i++) if (state.pieces[i].color === color && state.pieces[i].type === 'FL') return true;
+    return false;
+  }
+
+  // material eval from `color`'s perspective (+ tiny support bonus per canon).
+  function evaluate(state, color) {
+    var score = 0;
+    for (var i = 0; i < state.pieces.length; i++) {
+      var p = state.pieces[i], v = VALUE[p.type] || 0;
+      score += (p.color === color ? v : -v);
+    }
+    if (state.winner === color) score += 100000;
+    else if (state.winner === opp(color)) score -= 100000;
+    // support: friendly pieces orthogonally adjacent reinforce each other
+    score += supportBonus(state, color) - supportBonus(state, opp(color));
+    return score;
+  }
+  function supportBonus(state, color) {
+    var b = 0;
+    for (var i = 0; i < state.pieces.length; i++) {
+      var p = state.pieces[i];
+      if (p.color !== color || p.board !== 'ground') continue;
+      for (var d = 0; d < ORTHO.length; d++) {
+        var n = pieceAt(state, 'ground', p.r + ORTHO[d][0], p.c + ORTHO[d][1]);
+        if (n && n.color === color) b += 0.05;
+      }
+    }
+    return b;
+  }
+
+  window.Ludus = {
+    GROUND: GROUND, SKY: SKY, SKY_OFF: SKY_OFF, VALUE: VALUE, AERIAL: AERIAL,
+    initialState: initialState, legalActions: legalActions, applyAction: applyAction,
+    evaluate: evaluate, clone: clone, pieceAt: pieceAt, pieceById: pieceById,
+    underSky: underSky, groundToSky: groundToSky, skyToGround: skyToGround,
+    opp: opp, hasFirstLord: hasFirstLord, isAerial: function (t) { return !!AERIAL[t]; }
+  };
+})();

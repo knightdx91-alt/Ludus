@@ -1,0 +1,151 @@
+// node ludus/test_net.mjs — verify the online room handshake in net.js
+// against a faithful in-memory mock of the Firebase compat Realtime DB.
+// Two independent clients (own contexts/clientIds) share one backend, so this
+// exercises createRoom -> onPlayers(not full) -> joinRoom -> onPlayers(full).
+import fs from 'fs';
+import vm from 'vm';
+
+const NET_SRC = fs.readFileSync(new URL('./net.js', import.meta.url), 'utf8');
+let pass = 0, fail = 0;
+function ok(name, cond) { cond ? (pass++, console.log('  ok  ' + name)) : (fail++, console.log('FAIL  ' + name)); }
+function deep(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+
+// ---- shared in-memory Firebase Realtime DB backend ----------------------
+function makeStore() {
+  const root = {};
+  const listeners = []; // {path, cb}
+  const primed = []; // paths read via once() — their subtree is "cached" locally
+  function isCached(path) { return primed.some(function (p) { return path === p || path.startsWith(p + '/'); }); }
+  function getNode(path, create) {
+    const segs = path.split('/').filter(Boolean);
+    let n = root;
+    for (let i = 0; i < segs.length; i++) {
+      if (n[segs[i]] == null) { if (!create) return undefined; n[segs[i]] = {}; }
+      n = n[segs[i]];
+    }
+    return n;
+  }
+  function setNode(path, val) {
+    const segs = path.split('/').filter(Boolean);
+    if (!segs.length) return;
+    let n = root;
+    for (let i = 0; i < segs.length - 1; i++) { if (n[segs[i]] == null) n[segs[i]] = {}; n = n[segs[i]]; }
+    if (val === null || val === undefined) delete n[segs[segs.length - 1]];
+    else n[segs[segs.length - 1]] = deep(val);
+  }
+  function valAt(path) { const n = getNode(path, false); return n === undefined ? null : deep(n); }
+  function notify(path) {
+    listeners.forEach(function (l) {
+      if (l.path === path || path.startsWith(l.path + '/') || l.path.startsWith(path + '/'))
+        l.cb({ val: function () { return valAt(l.path); }, exists: function () { return valAt(l.path) !== null; } });
+    });
+  }
+  function ref(path) {
+    return {
+      _path: path,
+      child: function (p) { return ref(path + '/' + p); },
+      set: function (val) { setNode(path, val); notify(path); return Promise.resolve(); },
+      update: function (obj) { Object.keys(obj).forEach(function (k) { setNode(path + '/' + k, obj[k]); }); notify(path); return Promise.resolve(); },
+      once: function () { primed.push(path); const v = valAt(path); return Promise.resolve({ val: function () { return v; }, exists: function () { return v !== null; } }); },
+      transaction: function (fn) {
+        // Faithful to Firebase: the handler is first called with the LOCAL estimate,
+        // which is null for an uncached path. Returning undefined aborts with NO
+        // server retry. Only an already-cached (once'd) path sees the real value first.
+        const firstVal = isCached(path) ? valAt(path) : null;
+        const out = fn(firstVal);
+        if (out === undefined) { const cur = valAt(path); return Promise.resolve({ committed: false, snapshot: { val: function () { return cur; }, exists: function () { return cur !== null; } } }); }
+        setNode(path, out); notify(path);
+        return Promise.resolve({ committed: true, snapshot: { val: function () { return valAt(path); }, exists: function () { return valAt(path) !== null; } } });
+      },
+      on: function (_evt, cb) { const l = { path: path, cb: cb }; listeners.push(l); cb({ val: function () { return valAt(path); }, exists: function () { return valAt(path) !== null; } }); return cb; },
+      off: function (_evt, handler) { for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].cb === handler) listeners.splice(i, 1); }
+    };
+  }
+  return { ref: ref, _root: root };
+}
+
+// ---- spin up one net.js "client" bound to a shared backend ---------------
+function makeClient(store) {
+  const memLS = {};
+  const localStorage = {
+    getItem: function (k) { return k in memLS ? memLS[k] : null; },
+    setItem: function (k, v) { memLS[k] = String(v); }
+  };
+  const document = {
+    head: { appendChild: function (s) { queueMicrotask(function () { s.onload && s.onload(); }); } },
+    createElement: function () { return {}; }
+  };
+  const win = {
+    LUDUS_FIREBASE_CONFIG: { apiKey: 'x', databaseURL: 'mock://db' },
+    firebase: { initializeApp: function () { return {}; }, database: function () { return { ref: store.ref }; } }
+  };
+  const ctx = {
+    window: win, document: document, localStorage: localStorage,
+    Math: Math, JSON: JSON, Date: Date, Promise: Promise,
+    queueMicrotask: queueMicrotask, setTimeout: setTimeout, console: console
+  };
+  vm.createContext(ctx);
+  vm.runInContext(NET_SRC, ctx, { filename: 'net.js' });
+  return ctx.window.LudusNet;
+}
+
+const store = makeStore();
+const A = makeClient(store); // host (white)
+const B = makeClient(store); // joiner (black)
+
+ok('configured() true with mock config', A.configured() === true);
+ok('A and B have distinct client ids', A.clientId() !== B.clientId());
+
+(async function () {
+  // --- host creates a room ---
+  const room = await A.createRoom({ demo: 'initial-state' });
+  ok('createRoom returns a 5-char code', typeof room.roomId === 'string' && room.roomId.length === 5);
+  ok('host is white', room.color === 'white');
+
+  // --- host watches seats; should NOT be full yet ---
+  let hostSawFull = false, lastPlayers = null;
+  const unsub = A.onPlayers(room.ref, function (players) {
+    lastPlayers = players;
+    if (A.isFull(players)) hostSawFull = true;
+  });
+  ok('lobby: seats not full before opponent joins', hostSawFull === false);
+  ok('lobby: white seat occupied, black empty', !!(lastPlayers && lastPlayers.white && !lastPlayers.black));
+
+  // --- joiner joins by code ---
+  const joined = await B.joinRoom(room.roomId.toLowerCase()); // also tests case-normalisation
+  ok('joiner gets black seat', joined.color === 'black');
+  ok('joiner same room id', joined.roomId === room.roomId);
+
+  // --- host's onPlayers must now have fired full -> auto-start trigger ---
+  await Promise.resolve();
+  ok('host auto-start: onPlayers saw room full', hostSawFull === true);
+  ok('isFull true with both seats', A.isFull(lastPlayers) === true);
+  unsub();
+
+  // --- state sync: host pushes, joiner receives ---
+  let joinerState = null;
+  const unsubState = B.onState(joined.ref, function (s) { joinerState = s; });
+  await A.pushState(room.ref, { move: 1, board: 'after-white-move' });
+  await Promise.resolve();
+  ok('joiner receives host state push', joinerState && joinerState.move === 1);
+  unsubState();
+
+  // --- a third client cannot take a full room ---
+  const C = makeClient(store);
+  let fullRejected = false;
+  try { await C.joinRoom(room.roomId); } catch (e) { fullRejected = /full/i.test(e.message); }
+  ok('third client rejected from full room', fullRejected === true);
+
+  // --- joining a non-existent room fails cleanly ---
+  let missingRejected = false;
+  try { await B.joinRoom('ZZZZZ'); } catch (e) { missingRejected = /not found|full/i.test(e.message); }
+  ok('join of unknown code rejected', missingRejected === true);
+
+  // --- leaveRoom by both empties (deletes) the room ---
+  await A.leaveRoom(room.ref);
+  await B.leaveRoom(joined.ref);
+  ok('room deleted after both leave', store._root.rooms == null || store._root.rooms[room.roomId] == null);
+
+  console.log(`\n${pass} passed, ${fail} failed`);
+  process.exit(fail ? 1 : 0);
+})();
