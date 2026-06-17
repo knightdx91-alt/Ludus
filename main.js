@@ -135,7 +135,7 @@
   function renderRooms(rooms) {
     var host = $('roomList'); if (!host) return;
     var me = NET.clientId();
-    var open = rooms.filter(function (r) { return r.open && r.players.white !== me && r.players.black !== me; });
+    var open = rooms.filter(function (r) { return r.open && r.host !== me; });
     var live = rooms.filter(function (r) { return r.full; });
     host.innerHTML = '';
     if (!open.length && !live.length) {

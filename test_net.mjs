@@ -52,8 +52,10 @@ function makeStore() {
   function ref(path) {
     return {
       _path: path,
+      key: path.split('/').filter(Boolean).pop() || null,
       child: function (p) { return ref(path + '/' + p); },
       set: function (val) { setNode(path, val); notify(path); return Promise.resolve(); },
+      remove: function () { setNode(path, null); notify(path); return Promise.resolve(); },
       update: function (obj) { Object.keys(obj).forEach(function (k) { setNode(path + '/' + k, obj[k]); }); notify(path); return Promise.resolve(); },
       once: function () { primed.push(path); return Promise.resolve(snapOf(path)); },
       transaction: function (fn) {
@@ -186,10 +188,12 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   let lobby = [];
   const unsubRooms = A.onRooms(function (rooms) { lobby = rooms; });
   await Promise.resolve();
-  ok('onRooms lists the public room', lobby.some(function (r) { return r.id === room.roomId && r.full; }));
+  ok('onRooms lists the public room as full', lobby.some(function (r) { return r.id === room.roomId && r.full; }));
+  ok('lobby index holds no game state', store._root.lobby[room.roomId].state === undefined);
   const priv = await B.createRoom({ demo: 'x' }, { public: false });
   await Promise.resolve();
   ok('onRooms hides the private room', !lobby.some(function (r) { return r.id === priv.roomId; }));
+  ok('private room writes no lobby entry', !store._root.lobby[priv.roomId]);
   unsubRooms();
   await B.leaveRoom(priv.ref);
 
@@ -206,6 +210,7 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   await A.leaveRoom(room.ref);
   await B.leaveRoom(joined.ref);
   ok('room deleted after both leave', store._root.rooms == null || store._root.rooms[room.roomId] == null);
+  ok('lobby entry removed after both leave', store._root.lobby == null || store._root.lobby[room.roomId] == null);
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

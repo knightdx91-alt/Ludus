@@ -70,19 +70,37 @@
   }
 
   // Create a room as `white`. Returns {roomId, color, ref}.
-  // opts.public !== false → the room shows up in the open-games lobby.
+  // opts.public !== false → the room is advertised in the open-games lobby
+  // via a lightweight lobby/{id} index entry (no game state — that stays under
+  // rooms/{id}, which the rules only allow reading one room at a time).
   function createRoom(initialState, opts) {
     opts = opts || {};
     return init().then(function () {
-      var id = randomRoomId(), ref = db.ref('rooms/' + id);
+      var id = randomRoomId(), ref = db.ref('rooms/' + id), pub = opts.public !== false;
       return ref.set({
         state: initialState,
         players: { white: clientId(), black: null },
-        public: opts.public !== false,
+        public: pub,
         created: Date.now(),
         updated: Date.now()
+      }).then(function () {
+        // Advertise to the lobby, but never let a denied/failed lobby write
+        // break room creation — the room itself (joinable by code) still works.
+        if (pub) return db.ref('lobby/' + id).set({ open: true, full: false, host: clientId(), updated: Date.now() }).catch(function () {});
       }).then(function () { return { roomId: id, color: 'white', ref: ref }; });
     });
+  }
+
+  // Reflect a room's seat status into its lobby entry (if it has one — private
+  // rooms don't). Removes the entry when the room is gone.
+  function syncLobby(id, players) {
+    var ref = db.ref('lobby/' + id);
+    return ref.once('value').then(function (snap) {
+      if (!snap.exists()) return; // private room, or already cleaned up
+      if (!players) return ref.remove();
+      var full = isFull(players);
+      return ref.update({ open: !full, full: full, updated: Date.now() });
+    }).catch(function () {});
   }
 
   // Join an existing room, claiming a free color (prefers black). Returns {roomId,color,ref}.
@@ -108,7 +126,7 @@
           var players = res.snapshot.val();
           var color = players.white === me ? 'white' : (players.black === me ? 'black' : null);
           if (!color) throw new Error('room is full');
-          return { roomId: id, color: color, ref: ref };
+          return syncLobby(id, players).then(function () { return { roomId: id, color: color, ref: ref }; });
         });
       });
     });
@@ -150,21 +168,20 @@
   }
 
   // ---- lobby: the list of public rooms ---------------------------------
-  // cb(rooms[]) where each room is {id, players, open, full, updated}.
+  // Reads the lobby/ index (publicly readable) rather than rooms/ (which the
+  // rules only allow reading one room at a time). cb(rooms[]) where each entry
+  // is {id, host, open, full, updated}.
   function onRooms(cb) {
     var ref = null;
     init().then(function () {
-      ref = db.ref('rooms');
+      ref = db.ref('lobby');
       ref.on('value', function (snap) {
         var out = [];
         snap.forEach(function (child) {
           var r = child.val() || {};
-          if (r.public === false) return; // private (code-only) room — hide it
-          var p = r.players || {};
           out.push({
-            id: child.key, players: p,
-            open: !p.white || !p.black, full: isFull(p),
-            updated: r.updated || r.created || 0
+            id: child.key, host: r.host || null,
+            open: !!r.open, full: !!r.full, updated: r.updated || 0
           });
         });
         out.sort(function (a, b) { return b.updated - a.updated; });
@@ -195,7 +212,7 @@
   // (so abandoned rooms — including their state — don't linger in the DB).
   function leaveRoom(ref) {
     if (!ref) return Promise.resolve();
-    var me = clientId();
+    var me = clientId(), id = ref.key;
     return ref.once('value').then(function (snap) {
       if (!snap.exists()) return;
       return ref.transaction(function (room) {
@@ -206,6 +223,9 @@
         if (!players.white && !players.black) return null; // empty -> remove whole room
         room.players = players;
         return room;
+      }).then(function (res) {
+        var room = res.snapshot.val();
+        return syncLobby(id, room ? (room.players || null) : null); // delete or update the lobby entry
       });
     }).then(function () {}).catch(function () {});
   }

@@ -89,13 +89,19 @@ Lord hanging. This keeps move generation simple and the AI fast.)
 - `ludus/index.html` — standalone entry page (served at `…/ludus/`).
 
 ## Online (Firebase Realtime DB)
-The DB has two top-level nodes:
-- `rooms/{id}` — `{ state, players:{white,black}, public, created, updated }`. A room
-  with `public:true` shows up in the **Open Games** lobby (Join an open seat, or
-  **Watch** a full one as a spectator). Spectators subscribe to `state` only and never
-  claim a seat. Empty rooms self-delete on leave.
+The DB has three top-level nodes:
+- `rooms/{id}` — `{ state, players:{white,black}, public, created, updated }`. The full
+  game state. The rules allow reading **one room at a time** (by id) so joiners and
+  spectators can subscribe, but not bulk-listing every game. Empty rooms self-delete on leave.
+- `lobby/{id}` — `{ open, full, host, updated }`. A lightweight, publicly-listable index
+  of `public` rooms (no game state) that powers the **Open Games** lobby: Join an open
+  seat, or **Watch** a full game as a spectator. Kept in sync by create/join/leave.
 - `presence/{clientId}` — written while a client is connected (via `.info/connected` +
   `onDisconnect().remove()`); the header **online count** is just this node's child count.
+
+Why the split: spectating and joining need a single room readable, but the lobby needs a
+*list*. Exposing all of `rooms` would leak every game's full state, so the listable part
+is the metadata-only `lobby` index instead.
 
 Recommended rules (public reads, writes only by the two seated players + own presence):
 ```json
@@ -107,6 +113,7 @@ Recommended rules (public reads, writes only by the two seated players + own pre
         ".write": "!data.exists() || !data.child('players/white').exists() || !data.child('players/black').exists() || data.child('players/white').val() == auth.uid || data.child('players/black').val() == auth.uid || newData.child('players/white').val() == auth.uid || newData.child('players/black').val() == auth.uid"
       }
     },
+    "lobby":    { ".read": true, "$id": { ".write": true } },
     "presence": { ".read": true, "$cid": { ".write": true } }
   }
 }
