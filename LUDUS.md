@@ -87,3 +87,30 @@ Lord hanging. This keeps move generation simple and the AI fast.)
 - `ludus/net.js` — Firebase Realtime DB rooms for online 2-player (config in `ludus/firebase-config.js`).
 - `ludus/main.js` — menu, mode wiring (local-bot / hotseat / online), glue.
 - `ludus/index.html` — standalone entry page (served at `…/ludus/`).
+
+## Online (Firebase Realtime DB)
+The DB has two top-level nodes:
+- `rooms/{id}` — `{ state, players:{white,black}, public, created, updated }`. A room
+  with `public:true` shows up in the **Open Games** lobby (Join an open seat, or
+  **Watch** a full one as a spectator). Spectators subscribe to `state` only and never
+  claim a seat. Empty rooms self-delete on leave.
+- `presence/{clientId}` — written while a client is connected (via `.info/connected` +
+  `onDisconnect().remove()`); the header **online count** is just this node's child count.
+
+Recommended rules (public reads, writes only by the two seated players + own presence):
+```json
+{
+  "rules": {
+    "rooms": {
+      "$id": {
+        ".read": true,
+        ".write": "!data.exists() || !data.child('players/white').exists() || !data.child('players/black').exists() || data.child('players/white').val() == auth.uid || data.child('players/black').val() == auth.uid || newData.child('players/white').val() == auth.uid || newData.child('players/black').val() == auth.uid"
+      }
+    },
+    "presence": { ".read": true, "$cid": { ".write": true } }
+  }
+}
+```
+Test mode (open read/write) works for prototyping; tighten before any public deploy.
+Note: the clients use anonymous client ids in `localStorage`, not Firebase Auth — for
+strict enforcement add anonymous auth and key seats on `auth.uid`.

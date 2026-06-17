@@ -52,12 +52,16 @@
   }
 
   // Create a room as `white`. Returns {roomId, color, ref}.
-  function createRoom(initialState) {
+  // opts.public !== false → the room shows up in the open-games lobby.
+  function createRoom(initialState, opts) {
+    opts = opts || {};
     return init().then(function () {
       var id = randomRoomId(), ref = db.ref('rooms/' + id);
       return ref.set({
         state: initialState,
         players: { white: clientId(), black: null },
+        public: opts.public !== false,
+        created: Date.now(),
         updated: Date.now()
       }).then(function () { return { roomId: id, color: 'white', ref: ref }; });
     });
@@ -90,6 +94,66 @@
         });
       });
     });
+  }
+
+  // Watch a room without claiming a seat (spectator). Returns {roomId, ref}.
+  function spectate(id) {
+    id = (id || '').trim().toUpperCase();
+    return init().then(function () {
+      var ref = db.ref('rooms/' + id);
+      return ref.child('state').once('value').then(function (snap) {
+        if (!snap.exists()) throw new Error('room not found');
+        return { roomId: id, ref: ref };
+      });
+    });
+  }
+
+  // ---- presence: a live count of connected clients ---------------------
+  // Each client writes presence/{clientId} while connected and clears it on
+  // disconnect (handled server-side by onDisconnect, so closed tabs/dropped
+  // networks are cleaned up automatically).
+  function startPresence() {
+    return init().then(function () {
+      var ref = db.ref('presence/' + clientId());
+      db.ref('.info/connected').on('value', function (snap) {
+        if (snap.val() === true) { ref.onDisconnect().remove(); ref.set(Date.now()); }
+      });
+    }).catch(function () {});
+  }
+
+  // Subscribe to the online-client count. cb(n). Returns unsubscribe fn.
+  function onOnlineCount(cb) {
+    var ref = null;
+    init().then(function () {
+      ref = db.ref('presence');
+      ref.on('value', function (snap) { cb(snap.numChildren()); });
+    }).catch(function () {});
+    return function () { if (ref) try { ref.off('value'); } catch (e) {} };
+  }
+
+  // ---- lobby: the list of public rooms ---------------------------------
+  // cb(rooms[]) where each room is {id, players, open, full, updated}.
+  function onRooms(cb) {
+    var ref = null;
+    init().then(function () {
+      ref = db.ref('rooms');
+      ref.on('value', function (snap) {
+        var out = [];
+        snap.forEach(function (child) {
+          var r = child.val() || {};
+          if (r.public === false) return; // private (code-only) room — hide it
+          var p = r.players || {};
+          out.push({
+            id: child.key, players: p,
+            open: !p.white || !p.black, full: isFull(p),
+            updated: r.updated || r.created || 0
+          });
+        });
+        out.sort(function (a, b) { return b.updated - a.updated; });
+        cb(out);
+      });
+    }).catch(function () {});
+    return function () { if (ref) try { ref.off('value'); } catch (e) {} };
   }
 
   // Subscribe to state changes. cb(state). Returns unsubscribe fn.
@@ -130,7 +194,9 @@
 
   window.LudusNet = {
     configured: configured, clientId: clientId,
-    createRoom: createRoom, joinRoom: joinRoom, onState: onState, pushState: pushState,
-    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom
+    createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
+    onState: onState, pushState: pushState,
+    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom,
+    startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms
   };
 })();

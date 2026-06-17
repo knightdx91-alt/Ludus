@@ -97,6 +97,19 @@
   .pcard .name { font-size:13px; font-weight:600; color:var(--ink); }
   .pcard .desc { font-size:12px; line-height:1.5; color:var(--muted); }
   .tag-air { color:var(--cold); font-size:11px; }
+  /* online lobby */
+  .lobby-section { margin-top:22px; max-width:520px; }
+  .lobby-section h3 { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--cold);
+    margin:0 0 10px; border-bottom:1px solid #243140; padding-bottom:6px; }
+  #roomList { display:flex; flex-direction:column; gap:8px; }
+  .room-item { display:flex; align-items:center; gap:12px; text-align:left; width:100%;
+    background:#0f1620; border:1px solid #243140; padding:11px 14px; }
+  .room-item:hover { border-color:var(--cold); background:#13202c; }
+  .room-item .rc { font-family:monospace; font-size:18px; letter-spacing:3px; color:var(--cold); }
+  .room-item .rs { font-size:13px; color:var(--muted); flex:1; }
+  .room-item .rj { color:var(--warm); }
+  .lobby-empty { font-size:13px; color:var(--muted); padding:10px 2px; }
+
   .warn { color:#ffd27f; font-size:13px; line-height:1.5; }
   .modal-foot { display:flex; gap:10px; justify-content:flex-end; margin-top:8px; }
 </style>
@@ -107,7 +120,10 @@
     <h1>LUDUS</h1>
     <p>The Aleran war-game — 11×11 ground board + a 5×5 sky board over its centre. Capture the First Lord (★).</p>
   </div>
-  <button id="btnRules" class="primary">📜 Rules</button>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span id="onlineCount" style="display:none;font-size:12px;color:#8fe39a;letter-spacing:.5px"></span>
+    <button id="btnRules" class="primary">📜 Rules</button>
+  </div>
 </header>
 
 <!-- ===== TITLE / OPPONENT SELECT ===== -->
@@ -157,6 +173,11 @@
   </div>
   <div id="roomBox">Room <span id="roomCode">—</span> · You are <b id="roomColor">—</b>. Share the code with your opponent.</div>
   <div id="onlineStatus" style="margin-top:12px;font-size:14px;color:var(--warm);min-height:20px"></div>
+
+  <div class="lobby-section">
+    <h3>Open Games</h3>
+    <div id="roomList"><div class="lobby-empty">Looking for games…</div></div>
+  </div>
   <div style="margin-top:16px">
     <button id="btnPassPlay" class="ghost">Or play Pass &amp; Play on this screen ›</button>
   </div>

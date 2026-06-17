@@ -23,7 +23,7 @@
   var humanColors = {};
   var difficulty = 'medium', aiColor = 'black';
   var currentOpponent = null, currentSide = 'white';
-  var net = null, unsub = null, unsubPlayers = null, applying = false;
+  var net = null, unsub = null, unsubPlayers = null, applying = false, unsubRooms = null;
 
   function $(id) { return document.getElementById(id); }
   function setStatus(m) { $('status').textContent = m; }
@@ -87,12 +87,14 @@
     ui.render(state);
     if (state.winner) {
       var youWin = humanColors[state.winner];
-      setStatus((mode === 'hotseat' ? state.winner.toUpperCase() + ' wins' : (youWin ? 'Victory — you' : 'Defeat — your foe') + ' captured the First Lord') + '.');
+      if (mode === 'spectate') setStatus(state.winner.toUpperCase() + ' wins — captured the First Lord.');
+      else setStatus((mode === 'hotseat' ? state.winner.toUpperCase() + ' wins' : (youWin ? 'Victory — you' : 'Defeat — your foe') + ' captured the First Lord') + '.');
       ui.setInteractive(false);
       return;
     }
     var humanTurn = !!humanColors[state.turn];
     ui.setInteractive(humanTurn);
+    if (mode === 'spectate') { setStatus('Spectating — ' + state.turn.toUpperCase() + ' to move.'); return; }
     if (mode === 'online') { setStatus(humanTurn ? 'Your move (' + state.turn + ').' : 'Waiting for ' + state.turn + '…'); return; }
     if (humanTurn) { setStatus(state.turn.toUpperCase() + ' to move.'); return; }
     setStatus((currentOpponent ? currentOpponent.name : state.turn.toUpperCase()) + ' is thinking…');
@@ -123,8 +125,63 @@
     showScreen('screenOnline');
   }
 
+  // ---- lobby: browse open games & live games to spectate ---------------
+  function showOnlineScreen() {
+    showScreen('screenOnline');
+    if (NET.configured() && !unsubRooms) unsubRooms = NET.onRooms(renderRooms);
+  }
+  function stopRooms() { if (unsubRooms) { unsubRooms(); unsubRooms = null; } }
+
+  function renderRooms(rooms) {
+    var host = $('roomList'); if (!host) return;
+    var me = NET.clientId();
+    var open = rooms.filter(function (r) { return r.open && r.players.white !== me && r.players.black !== me; });
+    var live = rooms.filter(function (r) { return r.full; });
+    host.innerHTML = '';
+    if (!open.length && !live.length) {
+      host.innerHTML = '<div class="lobby-empty">No open games right now — create one above and wait for a player, or share your code.</div>';
+      return;
+    }
+    function row(r, label, action) {
+      var b = document.createElement('button'); b.className = 'room-item';
+      b.innerHTML = '<span class="rc">' + r.id + '</span><span class="rs">' + label + '</span>';
+      b.onclick = action; host.appendChild(b);
+    }
+    open.forEach(function (r) {
+      row(r, '<b>Open</b> — waiting for a player · <span class="rj">Join ›</span>', function () { stopRooms(); joinOnline(r.id); });
+    });
+    live.forEach(function (r) {
+      row(r, 'In progress · <span class="rj">Watch ›</span>', function () { stopRooms(); spectateOnline(r.id); });
+    });
+  }
+
+  // SPECTATE: watch a live game without taking a seat.
+  function spectateOnline(code) {
+    teardownNet();
+    $('onlineStatus').textContent = 'Loading game…';
+    NET.spectate(code).then(function (room) {
+      net = room; mode = 'spectate'; currentOpponent = null; humanColors = {};
+      $('onlineStatus').textContent = '';
+      enterSpectate(room);
+    }).catch(onlineError);
+  }
+
+  function enterSpectate(room) {
+    net = room; mode = 'spectate';
+    $('oppLabel').textContent = 'Spectating · room ' + room.roomId;
+    ui.setPerspective('white'); $('btnFlip').dataset.p = 'white';
+    $('roomBox').style.display = 'block';
+    $('roomCode').textContent = room.roomId; $('roomColor').textContent = 'spectator';
+    showScreen('screenGame');
+    ui.clearSelection();
+    state = E.initialState();
+    unsub = NET.onState(room.ref, function (remote) { state = remote; loop(); });
+    loop();
+  }
+
   // CREATE: open a room, sit in the lobby, and start the moment a foe joins.
   function createOnline() {
+    stopRooms();
     teardownNet();
     $('onlineStatus').textContent = 'Creating room…';
     NET.createRoom(E.initialState()).then(function (room) {
@@ -144,6 +201,7 @@
 
   // JOIN: claim a seat in an existing room and go straight into the game.
   function joinOnline(code) {
+    stopRooms();
     teardownNet();
     $('onlineStatus').textContent = 'Joining…';
     NET.joinRoom(code).then(function (room) {
@@ -193,9 +251,9 @@
     $('sideBack').onclick = function () { showScreen('screenTitle'); };
 
     // online
-    $('btnAnotherPlayer').onclick = function () { showScreen('screenOnline'); };
-    $('onlineBack').onclick = function () { showScreen('screenTitle'); };
-    $('btnPassPlay').onclick = startHotseat;
+    $('btnAnotherPlayer').onclick = showOnlineScreen;
+    $('onlineBack').onclick = function () { stopRooms(); showScreen('screenTitle'); };
+    $('btnPassPlay').onclick = function () { stopRooms(); startHotseat(); };
     $('btnCreate').onclick = function () {
       if (!NET.configured()) { showScreen('screenOnline'); setStatus(''); alert('Online play is not configured yet (ludus/firebase-config.js).'); return; }
       createOnline();
@@ -246,6 +304,15 @@
     });
 
     if (!NET.configured()) $('btnCreate').title = $('btnJoin').title = 'Configure ludus/firebase-config.js to enable online play';
+
+    // presence: announce ourselves and show the live online count
+    if (NET.configured()) {
+      NET.startPresence();
+      NET.onOnlineCount(function (n) {
+        var el = $('onlineCount');
+        if (el) { el.textContent = '● ' + n + ' online'; el.style.display = ''; }
+      });
+    }
 
     showScreen('screenTitle');
   }

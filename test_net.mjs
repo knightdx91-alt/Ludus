@@ -34,10 +34,19 @@ function makeStore() {
     else n[segs[segs.length - 1]] = deep(val);
   }
   function valAt(path) { const n = getNode(path, false); return n === undefined ? null : deep(n); }
+  function snapOf(path) {
+    return {
+      val: function () { return valAt(path); },
+      exists: function () { return valAt(path) !== null; },
+      key: path.split('/').filter(Boolean).pop() || null,
+      numChildren: function () { const v = valAt(path); return v && typeof v === 'object' ? Object.keys(v).length : 0; },
+      forEach: function (cb) { const v = valAt(path); if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { cb(snapOf(path + '/' + k)); }); }
+    };
+  }
   function notify(path) {
     listeners.forEach(function (l) {
       if (l.path === path || path.startsWith(l.path + '/') || l.path.startsWith(path + '/'))
-        l.cb({ val: function () { return valAt(l.path); }, exists: function () { return valAt(l.path) !== null; } });
+        l.cb(snapOf(l.path));
     });
   }
   function ref(path) {
@@ -46,7 +55,7 @@ function makeStore() {
       child: function (p) { return ref(path + '/' + p); },
       set: function (val) { setNode(path, val); notify(path); return Promise.resolve(); },
       update: function (obj) { Object.keys(obj).forEach(function (k) { setNode(path + '/' + k, obj[k]); }); notify(path); return Promise.resolve(); },
-      once: function () { primed.push(path); const v = valAt(path); return Promise.resolve({ val: function () { return v; }, exists: function () { return v !== null; } }); },
+      once: function () { primed.push(path); return Promise.resolve(snapOf(path)); },
       transaction: function (fn) {
         // Faithful to Firebase: the handler is first called with the LOCAL estimate,
         // which is null for an uncached path. Returning undefined aborts with NO
@@ -57,7 +66,13 @@ function makeStore() {
         setNode(path, out); notify(path);
         return Promise.resolve({ committed: true, snapshot: { val: function () { return valAt(path); }, exists: function () { return valAt(path) !== null; } } });
       },
-      on: function (_evt, cb) { const l = { path: path, cb: cb }; listeners.push(l); cb({ val: function () { return valAt(path); }, exists: function () { return valAt(path) !== null; } }); return cb; },
+      onDisconnect: function () { return { remove: function () { return Promise.resolve(); } }; },
+      on: function (_evt, cb) {
+        const l = { path: path, cb: cb }; listeners.push(l);
+        if (path === '.info/connected') cb({ val: function () { return true; } });
+        else cb(snapOf(path));
+        return cb;
+      },
       off: function (_evt, handler) { for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].cb === handler) listeners.splice(i, 1); }
     };
   }
@@ -140,6 +155,40 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   let missingRejected = false;
   try { await B.joinRoom('ZZZZZ'); } catch (e) { missingRejected = /not found|full/i.test(e.message); }
   ok('join of unknown code rejected', missingRejected === true);
+
+  // --- spectator can watch a live room without taking a seat ---
+  let specState = null;
+  const spec = await C.spectate(room.roomId);
+  ok('spectate returns the room ref', spec.roomId === room.roomId);
+  const unsubSpec = C.onState(spec.ref, function (s) { specState = s; });
+  await A.pushState(room.ref, { move: 2, board: 'after-black-move' });
+  await Promise.resolve();
+  ok('spectator receives live state', specState && specState.move === 2);
+  ok('spectate left both seats untouched', A.isFull(store._root.rooms[room.roomId].players) === true);
+  unsubSpec();
+  let specMissing = false;
+  try { await C.spectate('ZZZZZ'); } catch (e) { specMissing = /not found/i.test(e.message); }
+  ok('spectate of unknown room rejected', specMissing === true);
+
+  // --- lobby listing: public rooms surface; private ones stay hidden ---
+  let lobby = [];
+  const unsubRooms = A.onRooms(function (rooms) { lobby = rooms; });
+  await Promise.resolve();
+  ok('onRooms lists the public room', lobby.some(function (r) { return r.id === room.roomId && r.full; }));
+  const priv = await B.createRoom({ demo: 'x' }, { public: false });
+  await Promise.resolve();
+  ok('onRooms hides the private room', !lobby.some(function (r) { return r.id === priv.roomId; }));
+  unsubRooms();
+  await B.leaveRoom(priv.ref);
+
+  // --- presence: count reflects connected clients ---
+  let count = 0;
+  const unsubCount = A.onOnlineCount(function (n) { count = n; });
+  await A.startPresence();
+  await B.startPresence();
+  await Promise.resolve();
+  ok('online count tracks present clients', count >= 2);
+  unsubCount();
 
   // --- leaveRoom by both empties (deletes) the room ---
   await A.leaveRoom(room.ref);
