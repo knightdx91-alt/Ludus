@@ -51,6 +51,27 @@
     return o;
   }
 
+  // Arm an onDisconnect rule (guarded so the test mock / older SDKs degrade
+  // gracefully). Firebase fires these server-side when the socket drops, so a
+  // closed/refreshed tab cleans up after itself instead of leaving a ghost room.
+  function onDisc(ref) {
+    return (ref && typeof ref.onDisconnect === 'function') ? ref.onDisconnect() : null;
+  }
+
+  // While a host sits alone in the lobby, a dropped connection should delete the
+  // whole room — otherwise an abandoned, never-played room lingers forever and
+  // looks "in progress". Call disarmRoom() once an opponent actually joins.
+  function armLobby(ref) { var od = onDisc(ref); if (od) od.remove(); }
+  function disarmRoom(ref) { var od = onDisc(ref); if (od) od.cancel(); }
+
+  // In an active game, a drop should only vacate our own seat (so a network blip
+  // never nukes a live match); the last player out still removes the room.
+  function armSeat(ref, color) {
+    disarmRoom(ref);                       // cancel the lobby's whole-room remove
+    var od = onDisc(ref.child('players/' + color));
+    if (od) od.remove();
+  }
+
   // Create a room as `white`. Returns {roomId, color, ref}.
   function createRoom(initialState) {
     return init().then(function () {
@@ -59,7 +80,7 @@
         state: initialState,
         players: { white: clientId(), black: null },
         updated: Date.now()
-      }).then(function () { return { roomId: id, color: 'white', ref: ref }; });
+      }).then(function () { armLobby(ref); return { roomId: id, color: 'white', ref: ref }; });
     });
   }
 
@@ -113,6 +134,7 @@
   // (so abandoned rooms — including their state — don't linger in the DB).
   function leaveRoom(ref) {
     if (!ref) return Promise.resolve();
+    disarmRoom(ref); // we're leaving cleanly — drop any pending onDisconnect rule
     var me = clientId();
     return ref.once('value').then(function (snap) {
       if (!snap.exists()) return;
@@ -131,6 +153,7 @@
   window.LudusNet = {
     configured: configured, clientId: clientId,
     createRoom: createRoom, joinRoom: joinRoom, onState: onState, pushState: pushState,
-    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom
+    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom,
+    armSeat: armSeat, disarmRoom: disarmRoom
   };
 })();

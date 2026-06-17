@@ -40,10 +40,27 @@ function makeStore() {
         l.cb({ val: function () { return valAt(l.path); }, exists: function () { return valAt(l.path) !== null; } });
     });
   }
+  const onDisc = []; // pending {path, val} ops applied when a client "disconnects"
+  // Apply pending onDisconnect ops. Real Firebase only fires the dropped
+  // client's rules, so an optional path prefix lets a test drop one client.
+  function flushDisconnect(prefix) {
+    for (let i = onDisc.length - 1; i >= 0; i--) {
+      const op = onDisc[i];
+      if (prefix && !(op.path === prefix || op.path.startsWith(prefix + '/'))) continue;
+      onDisc.splice(i, 1); setNode(op.path, op.val); notify(op.path);
+    }
+  }
   function ref(path) {
     return {
       _path: path,
       child: function (p) { return ref(path + '/' + p); },
+      onDisconnect: function () {
+        return {
+          remove: function () { onDisc.push({ path: path, val: null }); return Promise.resolve(); },
+          set: function (v) { onDisc.push({ path: path, val: v }); return Promise.resolve(); },
+          cancel: function () { for (let i = onDisc.length - 1; i >= 0; i--) if (onDisc[i].path === path) onDisc.splice(i, 1); return Promise.resolve(); }
+        };
+      },
       set: function (val) { setNode(path, val); notify(path); return Promise.resolve(); },
       update: function (obj) { Object.keys(obj).forEach(function (k) { setNode(path + '/' + k, obj[k]); }); notify(path); return Promise.resolve(); },
       once: function () { primed.push(path); const v = valAt(path); return Promise.resolve({ val: function () { return v; }, exists: function () { return v !== null; } }); },
@@ -61,7 +78,7 @@ function makeStore() {
       off: function (_evt, handler) { for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].cb === handler) listeners.splice(i, 1); }
     };
   }
-  return { ref: ref, _root: root };
+  return { ref: ref, _root: root, flushDisconnect: flushDisconnect };
 }
 
 // ---- spin up one net.js "client" bound to a shared backend ---------------
@@ -145,6 +162,24 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   await A.leaveRoom(room.ref);
   await B.leaveRoom(joined.ref);
   ok('room deleted after both leave', store._root.rooms == null || store._root.rooms[room.roomId] == null);
+
+  // --- ghost-room cleanup: a host who abandons the lobby (closes/refreshes the
+  //     tab) must not leave a room lingering as "in progress" ---
+  const ghost = await A.createRoom({ demo: 'lobby' });
+  ok('abandoned lobby room exists before disconnect', !!store._root.rooms[ghost.roomId]);
+  store.flushDisconnect(); // simulate the host's socket dropping
+  ok('abandoned lobby room auto-removed on host disconnect', store._root.rooms[ghost.roomId] == null);
+
+  // --- once a game is live, a single disconnect only vacates that seat (it must
+  //     NOT delete a match in progress) ---
+  const live = await A.createRoom({ demo: 'live' });
+  const liveB = await B.joinRoom(live.roomId);
+  A.armSeat(live.ref, 'white');   // both clients arm seat-only cleanup on entry
+  B.armSeat(liveB.ref, 'black');
+  store.flushDisconnect('rooms/' + live.roomId + '/players/white'); // white's tab drops
+  ok('live room survives one player disconnect', !!store._root.rooms[live.roomId]);
+  ok('disconnected player\'s seat is vacated', store._root.rooms[live.roomId].players.white == null);
+  ok('remaining player keeps their seat', store._root.rooms[live.roomId].players.black === B.clientId());
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

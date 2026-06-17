@@ -156,6 +156,7 @@
 
   function enterOnlineGame(room) {
     net = room; mode = 'online';
+    NET.armSeat(room.ref, room.color); // drop only our seat if our tab dies mid-game
     $('oppLabel').textContent = 'Online · you are ' + room.color;
     ui.setPerspective(room.color); $('btnFlip').dataset.p = room.color;
     $('roomBox').style.display = 'block';
