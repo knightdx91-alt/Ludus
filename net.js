@@ -10,7 +10,7 @@
 (function () {
   'use strict';
   var SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-  var app = null, db = null, loading = null;
+  var app = null, db = null, loading = null, authUid = null;
 
   function configured() {
     var c = window.LUDUS_FIREBASE_CONFIG;
@@ -31,15 +31,33 @@
     if (loading) return loading;
     loading = loadScript(SDK + 'firebase-app-compat.js')
       .then(function () { return loadScript(SDK + 'firebase-database-compat.js'); })
+      .then(function () { return loadScript(SDK + 'firebase-auth-compat.js'); })
       .then(function () {
         app = window.firebase.initializeApp(window.LUDUS_FIREBASE_CONFIG);
         db = window.firebase.database();
+        // Anonymous auth gives each player a Firebase-verified uid, so the DB
+        // rules can restrict room writes to the two seated players (spectators
+        // stay read-only). If auth is unavailable or not enabled in the console,
+        // we fall back to the localStorage client id and play still works.
+        if (window.firebase.auth) {
+          return window.firebase.auth().signInAnonymously()
+            .then(function (cred) {
+              var u = (cred && cred.user) || window.firebase.auth().currentUser;
+              authUid = (u && u.uid) || null;
+              return db;
+            })
+            .catch(function () { return db; });
+        }
         return db;
       });
     return loading;
   }
 
+  // Stable per-player identity. Prefers the Firebase-verified anonymous uid
+  // (so seats/presence are enforceable by DB rules); falls back to a random
+  // localStorage id when auth is unavailable.
   function clientId() {
+    if (authUid) return authUid;
     var k = 'ludus_client_id', v = localStorage.getItem(k);
     if (!v) { v = 'c' + Math.random().toString(36).slice(2) + Date.now().toString(36); localStorage.setItem(k, v); }
     return v;

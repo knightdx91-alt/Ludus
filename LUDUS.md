@@ -112,5 +112,11 @@ Recommended rules (public reads, writes only by the two seated players + own pre
 }
 ```
 Test mode (open read/write) works for prototyping; tighten before any public deploy.
-Note: the clients use anonymous client ids in `localStorage`, not Firebase Auth — for
-strict enforcement add anonymous auth and key seats on `auth.uid`.
+Seats and presence are keyed on a **Firebase Anonymous Auth** `uid` (see `net.js` `init`),
+so the rules above are enforceable. To use them you must, in the Firebase console:
+1. **Authentication → Sign-in method → enable Anonymous.**
+2. **Realtime Database → Rules → publish the JSON above.**
+Do this *after* the auth-enabled `net.js` is deployed (publishing strict rules first would
+deny writes from unauthenticated clients). If auth isn't enabled, `net.js` falls back to a
+`localStorage` client id and play still works — but the strict rules won't pass, so keep
+test-mode rules until Anonymous sign-in is on.

@@ -90,9 +90,20 @@ function makeClient(store) {
     head: { appendChild: function (s) { queueMicrotask(function () { s.onload && s.onload(); }); } },
     createElement: function () { return {}; }
   };
+  // Each client signs in anonymously to a distinct uid (as real Firebase would).
+  const uid = 'uid_' + Math.random().toString(36).slice(2);
+  const authObj = {
+    currentUser: { uid: uid },
+    signInAnonymously: function () { return Promise.resolve({ user: { uid: uid } }); }
+  };
   const win = {
     LUDUS_FIREBASE_CONFIG: { apiKey: 'x', databaseURL: 'mock://db' },
-    firebase: { initializeApp: function () { return {}; }, database: function () { return { ref: store.ref }; } }
+    firebase: {
+      initializeApp: function () { return {}; },
+      database: function () { return { ref: store.ref }; },
+      auth: function () { return authObj; }
+    },
+    _uid: uid
   };
   const ctx = {
     window: win, document: document, localStorage: localStorage,
@@ -116,6 +127,7 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   const room = await A.createRoom({ demo: 'initial-state' });
   ok('createRoom returns a 5-char code', typeof room.roomId === 'string' && room.roomId.length === 5);
   ok('host is white', room.color === 'white');
+  ok('seat keyed on the anonymous-auth uid', store._root.rooms[room.roomId].players.white === A.clientId() && /^uid_/.test(A.clientId()));
 
   // --- host watches seats; should NOT be full yet ---
   let hostSawFull = false, lastPlayers = null;
