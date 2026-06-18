@@ -24,6 +24,7 @@
   var difficulty = 'medium', aiColor = 'black';
   var currentOpponent = null, currentSide = 'white';
   var net = null, unsub = null, unsubPlayers = null, applying = false, unsubRooms = null;
+  var unsubAway = null, awayTimer = null, awayUntil = 0;
 
   function $(id) { return document.getElementById(id); }
   function setStatus(m) { $('status').textContent = m; }
@@ -59,6 +60,8 @@
     sessionActive = false;
     showScreen('screenTitle', true);
     graceUntil = Date.now() + GRACE_MS;
+    // Tell the opponent we've stepped away so they see a forfeit countdown too.
+    if (mode === 'online' && net && !(state && state.winner)) NET.setAway(net.ref, net.color, graceUntil);
     $('resumeBar').style.display = 'flex';
     tickGrace();
     graceTimer = setInterval(tickGrace, 1000);
@@ -66,17 +69,23 @@
   function tickGrace() {
     var left = Math.ceil((graceUntil - Date.now()) / 1000);
     if (left <= 0) { finalizeLeave(); return; }
-    $('resumeCount').textContent = '(' + left + 's)';
+    $('resumeCount').textContent = left + 's';
   }
   function resumeSession() {
     if (!lastSessionScreen) { finalizeLeave(); return; }
     clearGraceTimer(); $('resumeBar').style.display = 'none';
+    if (mode === 'online' && net) NET.clearAway(net.ref); // we're back — call off the forfeit
     showScreen(lastSessionScreen); // re-enters the session (and re-arms a back guard)
   }
   // Grace expired (or unresumable): actually abandon the session.
   function finalizeLeave() {
     clearGraceTimer(); $('resumeBar').style.display = 'none';
-    if (mode === 'online') leaveOnline(); else teardownNet();
+    if (mode === 'online' && net) {
+      // Forfeit: hand the win to the opponent so their board shows the result.
+      if (state && !state.winner) { state.winner = net.color === 'white' ? 'black' : 'white'; NET.pushState(net.ref, state); }
+      NET.clearAway(net.ref);
+      leaveOnline();
+    } else teardownNet();
     mode = null; sessionActive = false; lastSessionScreen = null;
   }
   // Intentional, immediate exit (menu buttons): no grace, nothing to resume.
@@ -168,6 +177,35 @@
   function teardownNet() {
     if (unsub) { unsub(); unsub = null; }
     if (unsubPlayers) { unsubPlayers(); unsubPlayers = null; }
+    if (unsubAway) { unsubAway(); unsubAway = null; }
+    clearAwayTimer(); $('awayBar').style.display = 'none';
+  }
+
+  function clearAwayTimer() { if (awayTimer) { clearInterval(awayTimer); awayTimer = null; } }
+
+  // The opponent stepped away (or came back). away = {color, until} | null.
+  function onOpponentAway(away) {
+    // Ignore our own away flag (we have the Resume banner) and a stale flag once
+    // the game is already decided.
+    if (!away || (net && away.color === net.color) || (state && state.winner)) {
+      clearAwayTimer(); $('awayBar').style.display = 'none'; return;
+    }
+    awayUntil = away.until || 0;
+    $('awayBar').style.display = 'flex';
+    tickAway();
+    clearAwayTimer(); awayTimer = setInterval(tickAway, 1000);
+  }
+  function tickAway() {
+    var left = Math.ceil((awayUntil - Date.now()) / 1000);
+    if (left <= 0) {
+      clearAwayTimer(); $('awayBar').style.display = 'none';
+      // Claim the win ourselves in case the absent player's tab can't push it.
+      if (mode === 'online' && net && state && !state.winner) {
+        state.winner = net.color; NET.pushState(net.ref, state); NET.clearAway(net.ref); loop();
+      }
+      return;
+    }
+    $('awayCount').textContent = left;
   }
 
   function onlineError(err) {
@@ -275,6 +313,7 @@
     ui.clearSelection();
     state = E.initialState(); // safe placeholder; the state listener syncs the authoritative board
     unsub = NET.onState(room.ref, function (remote) { if (applying) return; state = remote; loop(); });
+    unsubAway = NET.onAway(room.ref, onOpponentAway); // watch for the opponent stepping away
     setStatus('Room ' + room.roomId + ' — your opponent has joined. You are ' + room.color + '.');
     loop();
   }

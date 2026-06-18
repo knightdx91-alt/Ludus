@@ -270,6 +270,17 @@
   // Both seats filled?
   function isFull(players) { return !!(players && players.white && players.black); }
 
+  // ---- away / forfeit countdown ----------------------------------------
+  // When a player backs out of a live game we record rooms/{id}/away =
+  // {color, until} so the opponent can show a forfeit countdown. Resuming
+  // clears it; letting it lapse ends the game (the leaver pushes the result).
+  function setAway(ref, color, until) { return ref.child('away').set({ color: color, until: until }).catch(function () {}); }
+  function clearAway(ref) { return ref.child('away').remove().catch(function () {}); }
+  function onAway(ref, cb) {
+    var handler = ref.child('away').on('value', function (snap) { cb(snap.val()); });
+    return function () { ref.child('away').off('value', handler); };
+  }
+
   // Cancel/leave a room. If we're the last one out, delete the whole room
   // (so abandoned rooms — including their state — don't linger in the DB).
   function leaveRoom(ref) {
@@ -299,6 +310,7 @@
     createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
     onState: onState, pushState: pushState,
     onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom, armGame: armGame,
+    setAway: setAway, clearAway: clearAway, onAway: onAway,
     startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms,
     sweepStale: sweepStale
   };

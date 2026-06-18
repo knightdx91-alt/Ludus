@@ -248,6 +248,18 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   ok('disconnected player\'s seat is vacated', store._root.rooms[live.roomId].players.white == null);
   ok('remaining player keeps their seat', store._root.rooms[live.roomId].players.black === B.clientId());
 
+  // --- away/forfeit flag: a leaver marks away, the opponent observes it, and a
+  //     resume (or forfeit) clears it ---
+  let seenAway;
+  const unsubAway = B.onAway(live.ref, function (a) { seenAway = a; });
+  await A.setAway(live.ref, 'white', 5000);
+  await Promise.resolve();
+  ok('opponent sees the away flag with color + deadline', !!(seenAway && seenAway.color === 'white' && seenAway.until === 5000));
+  await A.clearAway(live.ref);
+  await Promise.resolve();
+  ok('away flag cleared on resume/forfeit', seenAway == null);
+  unsubAway();
+
   // --- stale-room sweep: on load, prune rooms whose host is no longer present.
   //     (A and B announced presence earlier; D never does, so D is "offline".) ---
   const D = makeClient(store);

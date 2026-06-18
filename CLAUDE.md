@@ -31,3 +31,8 @@ vacates that player's seat so a live match isn't destroyed. As a backstop,
 longer in `presence/` (cross-referencing the lobby ads against live presence),
 so a room that escaped `onDisconnect` still gets cleaned up the next time anyone
 opens the site.
+
+Backing out of a live online game (device back button) doesn't forfeit
+immediately: the leaver gets a 60s Resume banner, and the opponent sees a synced
+forfeit countdown via `rooms/{id}/away = {color, until}`. Resuming clears it;
+letting it lapse hands the win to whoever's still at the board.

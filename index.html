@@ -129,8 +129,8 @@
 <!-- Resume banner: shown briefly after the back button leaves a live game, so an
      accidental tap can be undone without abandoning the match. -->
 <div id="resumeBar" style="display:none;align-items:center;gap:12px;justify-content:center;background:#16324a;border:1px solid #2a5a7a;border-radius:10px;padding:10px 14px;margin:0 0 14px">
-  <span style="font-size:14px;color:#cfe8ff">You left a game in progress.</span>
-  <button id="resumeBtn" class="primary">↩ Resume <span id="resumeCount"></span></button>
+  <span style="font-size:14px;color:#cfe8ff">You left a game in progress — you forfeit in <b id="resumeCount" style="color:#fff"></b>.</span>
+  <button id="resumeBtn" class="primary">↩ Resume game</button>
 </div>
 
 <!-- ===== TITLE / OPPONENT SELECT ===== -->
@@ -215,6 +215,11 @@
       <button id="btnFlip" class="ghost" data-p="white" title="Flip board">⟳ Flip</button>
       <button id="btnNewGame">New Game</button>
     </div>
+  </div>
+  <!-- Shown to the player still at the board when their opponent backs out:
+       a live forfeit countdown that clears if the opponent returns in time. -->
+  <div id="awayBar" style="display:none;align-items:center;gap:10px;justify-content:center;background:#3a1f24;border:1px solid #7a2a3a;border-radius:10px;padding:10px 14px;margin:0 0 12px">
+    <span style="font-size:14px;color:#ffd6dd">Your opponent left the game — forfeits in <b id="awayCount" style="color:#fff">60</b>s.</span>
   </div>
   <div class="boardwrap">
     <canvas id="board"></canvas>
