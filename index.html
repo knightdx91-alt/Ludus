@@ -126,6 +126,13 @@
   </div>
 </header>
 
+<!-- Resume banner: shown briefly after the back button leaves a live game, so an
+     accidental tap can be undone without abandoning the match. -->
+<div id="resumeBar" style="display:none;align-items:center;gap:12px;justify-content:center;background:#16324a;border:1px solid #2a5a7a;border-radius:10px;padding:10px 14px;margin:0 0 14px">
+  <span style="font-size:14px;color:#cfe8ff">You left a game in progress.</span>
+  <button id="resumeBtn" class="primary">↩ Resume <span id="resumeCount"></span></button>
+</div>
+
 <!-- ===== TITLE / OPPONENT SELECT ===== -->
 <section id="screenTitle" class="screen active">
   <h2>Choose Your Opponent</h2>

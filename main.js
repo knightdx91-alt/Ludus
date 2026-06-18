@@ -28,9 +28,61 @@
   function $(id) { return document.getElementById(id); }
   function setStatus(m) { $('status').textContent = m; }
 
-  function showScreen(id) {
+  // ---- back-button / resume handling -----------------------------------
+  // Screens that represent a live session you shouldn't lose to a stray tap.
+  var SESSION_SCREENS = { screenGame: 1, screenLobby: 1 };
+  var GRACE_MS = 30000;                 // window to undo an accidental "back"
+  var sessionActive = false, lastSessionScreen = null;
+  var graceTimer = null, graceUntil = 0;
+
+  function showScreen(id, fromPop) {
     var s = document.querySelectorAll('.screen');
     for (var i = 0; i < s.length; i++) s[i].classList.toggle('active', s[i].id === id);
+    if (!fromPop) {
+      // Forward navigation: returning to the title is an intentional exit;
+      // anything deeper pushes a history entry so the device back button is
+      // caught by us (→ title) instead of unloading the whole site.
+      if (id === 'screenTitle') clearSession();
+      else if (window.history && history.pushState) history.pushState({ ludus: id }, '');
+    }
+    if (SESSION_SCREENS[id]) { // we're (re)entering a live session — cancel any pending grace
+      sessionActive = true; lastSessionScreen = id;
+      clearGraceTimer(); $('resumeBar').style.display = 'none';
+    }
+  }
+
+  function clearGraceTimer() { if (graceTimer) { clearInterval(graceTimer); graceTimer = null; } }
+
+  // Back was pressed during a live session: drop to the title but keep the game
+  // alive for GRACE_MS so an accidental tap can be undone via the Resume banner.
+  function softLeaveToTitle() {
+    sessionActive = false;
+    showScreen('screenTitle', true);
+    graceUntil = Date.now() + GRACE_MS;
+    $('resumeBar').style.display = 'flex';
+    tickGrace();
+    graceTimer = setInterval(tickGrace, 1000);
+  }
+  function tickGrace() {
+    var left = Math.ceil((graceUntil - Date.now()) / 1000);
+    if (left <= 0) { finalizeLeave(); return; }
+    $('resumeCount').textContent = '(' + left + 's)';
+  }
+  function resumeSession() {
+    if (!lastSessionScreen) { finalizeLeave(); return; }
+    clearGraceTimer(); $('resumeBar').style.display = 'none';
+    showScreen(lastSessionScreen); // re-enters the session (and re-arms a back guard)
+  }
+  // Grace expired (or unresumable): actually abandon the session.
+  function finalizeLeave() {
+    clearGraceTimer(); $('resumeBar').style.display = 'none';
+    if (mode === 'online') leaveOnline(); else teardownNet();
+    mode = null; sessionActive = false; lastSessionScreen = null;
+  }
+  // Intentional, immediate exit (menu buttons): no grace, nothing to resume.
+  function clearSession() {
+    clearGraceTimer(); $('resumeBar').style.display = 'none';
+    sessionActive = false; lastSessionScreen = null;
   }
 
   // ---- title: build opponent cards ------------------------------------
@@ -302,6 +354,14 @@
     });
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') document.querySelectorAll('.overlay.open').forEach(function (o) { o.classList.remove('open'); });
+    });
+
+    // device/browser back button: keep the user in the app (→ title), and give a
+    // grace period to undo an accidental back-out of a live game.
+    $('resumeBtn').onclick = resumeSession;
+    window.addEventListener('popstate', function () {
+      if (sessionActive) softLeaveToTitle();   // was in a game → title + Resume banner
+      else showScreen('screenTitle', true);     // already out → just stay on the menu
     });
 
     if (!NET.configured()) $('btnCreate').title = $('btnJoin').title = 'Configure ludus/firebase-config.js to enable online play';
