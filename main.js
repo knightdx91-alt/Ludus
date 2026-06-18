@@ -309,6 +309,7 @@
     // presence: announce ourselves and show the live online count
     if (NET.configured()) {
       NET.startPresence();
+      NET.sweepStale(); // on load, prune rooms whose host is no longer online
       NET.onOnlineCount(function (n) {
         var el = $('onlineCount');
         if (el) { el.textContent = '● ' + n + ' online'; el.style.display = ''; }

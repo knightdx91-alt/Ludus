@@ -26,4 +26,8 @@ node test_ludus.mjs  # game engine + AI
 
 Online rooms self-clean via Firebase `onDisconnect`: an abandoned lobby room
 (host closed the tab) removes itself and its `lobby/` ad; a mid-game drop only
-vacates that player's seat so a live match isn't destroyed.
+vacates that player's seat so a live match isn't destroyed. As a backstop,
+`NET.sweepStale()` runs on every page load and prunes any room whose host is no
+longer in `presence/` (cross-referencing the lobby ads against live presence),
+so a room that escaped `onDisconnect` still gets cleaned up the next time anyone
+opens the site.

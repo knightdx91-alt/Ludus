@@ -189,6 +189,36 @@
     }).catch(function () {});
   }
 
+  // ---- stale-room sweep ------------------------------------------------
+  // Backstop for onDisconnect: every time the app loads we cross-reference the
+  // lobby ads against live presence. A room whose host is no longer connected
+  // is abandoned — drop its lobby ad, and (when it isn't a locked, full game)
+  // the room itself. Rules let anyone write lobby/* and delete a room that has a
+  // free seat, so this is safe for any visitor to run. Best-effort: any denied
+  // write is swallowed so a stricter ruleset never breaks page load.
+  // GRACE keeps a brand-new room (whose host's presence write hasn't landed yet)
+  // from being swept the instant it's created.
+  var GRACE = 30000;
+  function sweepStale() {
+    return init().then(function () {
+      return Promise.all([db.ref('lobby').once('value'), db.ref('presence').once('value')]);
+    }).then(function (res) {
+      var present = {};
+      res[1].forEach(function (c) { present[c.key] = true; });
+      var now = Date.now(), ops = [];
+      res[0].forEach(function (child) {
+        var id = child.key, r = child.val() || {};
+        var hostOnline = r.host && present[r.host];
+        var age = now - (r.updated || 0);
+        if (!hostOnline && age > GRACE) {           // host gone & not just-created
+          ops.push(db.ref('lobby/' + id).remove().catch(function () {}));
+          if (!r.full) ops.push(db.ref('rooms/' + id).remove().catch(function () {}));
+        }
+      });
+      return Promise.all(ops);
+    }).catch(function () {});
+  }
+
   // Subscribe to the online-client count. cb(n). Returns unsubscribe fn.
   function onOnlineCount(cb) {
     var ref = null;
@@ -269,6 +299,7 @@
     createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
     onState: onState, pushState: pushState,
     onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom, armGame: armGame,
-    startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms
+    startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms,
+    sweepStale: sweepStale
   };
 })();

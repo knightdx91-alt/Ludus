@@ -248,6 +248,27 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   ok('disconnected player\'s seat is vacated', store._root.rooms[live.roomId].players.white == null);
   ok('remaining player keeps their seat', store._root.rooms[live.roomId].players.black === B.clientId());
 
+  // --- stale-room sweep: on load, prune rooms whose host is no longer present.
+  //     (A and B announced presence earlier; D never does, so D is "offline".) ---
+  const D = makeClient(store);
+  const aband = await D.createRoom({ demo: 'sweep' });
+  store._root.lobby[aband.roomId].updated = Date.now() - 60000; // age past the grace window
+  await A.sweepStale();
+  ok('sweep removes the abandoned lobby ad', store._root.lobby[aband.roomId] == null);
+  ok('sweep removes the abandoned open room', store._root.rooms[aband.roomId] == null);
+
+  // a room whose host IS still online must survive the sweep
+  await A.startPresence(); // re-announce (an earlier disconnect-flush cleared it)
+  const keep = await A.createRoom({ demo: 'keep' });
+  store._root.lobby[keep.roomId].updated = Date.now() - 60000;
+  await B.sweepStale();
+  ok('sweep keeps a room whose host is still online', !!store._root.lobby[keep.roomId]);
+
+  // a brand-new room (within the grace window) is never swept, even host-offline
+  const fresh = await D.createRoom({ demo: 'fresh' });
+  await A.sweepStale();
+  ok('sweep spares a just-created room (grace window)', !!store._root.lobby[fresh.roomId]);
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();
