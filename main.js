@@ -31,7 +31,7 @@
   // ---- back-button / resume handling -----------------------------------
   // Screens that represent a live session you shouldn't lose to a stray tap.
   var SESSION_SCREENS = { screenGame: 1, screenLobby: 1 };
-  var GRACE_MS = 30000;                 // window to undo an accidental "back"
+  var GRACE_MS = 60000;                 // window to undo an accidental "back"
   var sessionActive = false, lastSessionScreen = null;
   var graceTimer = null, graceUntil = 0;
 
