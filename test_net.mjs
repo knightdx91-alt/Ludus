@@ -14,6 +14,7 @@ function deep(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
 function makeStore() {
   const root = {};
   const listeners = []; // {path, cb}
+  const onDisc = []; // pending onDisconnect ops {path, val}; applied on "disconnect"
   const primed = []; // paths read via once() — their subtree is "cached" locally
   function isCached(path) { return primed.some(function (p) { return path === p || path.startsWith(p + '/'); }); }
   function getNode(path, create) {
@@ -68,7 +69,13 @@ function makeStore() {
         setNode(path, out); notify(path);
         return Promise.resolve({ committed: true, snapshot: { val: function () { return valAt(path); }, exists: function () { return valAt(path) !== null; } } });
       },
-      onDisconnect: function () { return { remove: function () { return Promise.resolve(); } }; },
+      onDisconnect: function () {
+        return {
+          remove: function () { onDisc.push({ path: path, val: null }); return Promise.resolve(); },
+          set: function (v) { onDisc.push({ path: path, val: v }); return Promise.resolve(); },
+          cancel: function () { for (let i = onDisc.length - 1; i >= 0; i--) if (onDisc[i].path === path) onDisc.splice(i, 1); return Promise.resolve(); }
+        };
+      },
       on: function (_evt, cb) {
         const l = { path: path, cb: cb }; listeners.push(l);
         if (path === '.info/connected') cb({ val: function () { return true; } });
@@ -78,7 +85,16 @@ function makeStore() {
       off: function (_evt, handler) { for (let i = listeners.length - 1; i >= 0; i--) if (listeners[i].cb === handler) listeners.splice(i, 1); }
     };
   }
-  return { ref: ref, _root: root };
+  // Apply pending onDisconnect ops. Real Firebase fires only the dropped
+  // client's rules, so an optional path prefix lets a test drop one client.
+  function flushDisconnect(prefix) {
+    for (let i = onDisc.length - 1; i >= 0; i--) {
+      const op = onDisc[i];
+      if (prefix && !(op.path === prefix || op.path.startsWith(prefix + '/'))) continue;
+      onDisc.splice(i, 1); setNode(op.path, op.val); notify(op.path);
+    }
+  }
+  return { ref: ref, _root: root, flushDisconnect: flushDisconnect };
 }
 
 // ---- spin up one net.js "client" bound to a shared backend ---------------
@@ -211,6 +227,26 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   await B.leaveRoom(joined.ref);
   ok('room deleted after both leave', store._root.rooms == null || store._root.rooms[room.roomId] == null);
   ok('lobby entry removed after both leave', store._root.lobby == null || store._root.lobby[room.roomId] == null);
+
+  // --- ghost cleanup: a host who abandons the lobby (closes/refreshes the tab)
+  //     must not leave the room advertised as an open/in-progress game ---
+  const ghost = await A.createRoom({ demo: 'lobby' });
+  ok('abandoned room + lobby ad exist before disconnect',
+    !!store._root.rooms[ghost.roomId] && !!store._root.lobby[ghost.roomId]);
+  store.flushDisconnect(); // host's socket drops
+  ok('abandoned room removed on host disconnect', store._root.rooms[ghost.roomId] == null);
+  ok('abandoned lobby ad removed on host disconnect', store._root.lobby[ghost.roomId] == null);
+
+  // --- a live game survives one player's disconnect: only that seat vacates,
+  //     and the match is NOT destroyed ---
+  const live = await A.createRoom({ demo: 'live' });
+  const liveB = await B.joinRoom(live.roomId);
+  A.armGame(live.ref, 'white');   // both clients arm seat-only cleanup on entry
+  B.armGame(liveB.ref, 'black');
+  store.flushDisconnect('rooms/' + live.roomId + '/players/white'); // white's tab drops
+  ok('live room survives one player disconnect', !!store._root.rooms[live.roomId]);
+  ok('disconnected player\'s seat is vacated', store._root.rooms[live.roomId].players.white == null);
+  ok('remaining player keeps their seat', store._root.rooms[live.roomId].players.black === B.clientId());
 
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);

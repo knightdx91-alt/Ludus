@@ -69,6 +69,18 @@
     return o;
   }
 
+  // ---- onDisconnect cleanup --------------------------------------------
+  // Firebase fires these server-side when a socket drops, so a closed/refreshed
+  // tab tidies up after itself instead of leaving a room advertised forever.
+  // All guarded so the test mock / a missing SDK degrade gracefully.
+  function odOf(path) {
+    if (!db) return null;
+    var r = db.ref(path);
+    return (r && typeof r.onDisconnect === 'function') ? r.onDisconnect() : null;
+  }
+  function odRemove(path) { var od = odOf(path); if (od && od.remove) od.remove(); }
+  function odCancel(path) { var od = odOf(path); if (od && od.cancel) od.cancel(); }
+
   // Create a room as `white`. Returns {roomId, color, ref}.
   // opts.public !== false → the room is advertised in the open-games lobby
   // via a lightweight lobby/{id} index entry (no game state — that stays under
@@ -87,7 +99,15 @@
         // Advertise to the lobby, but never let a denied/failed lobby write
         // break room creation — the room itself (joinable by code) still works.
         if (pub) return db.ref('lobby/' + id).set({ open: true, full: false, host: clientId(), updated: Date.now() }).catch(function () {});
-      }).then(function () { return { roomId: id, color: 'white', ref: ref }; });
+      }).then(function () {
+        // While the host waits alone, a dropped socket should delete the whole
+        // room AND its lobby ad — otherwise an abandoned, never-played room
+        // lingers in the open-games list looking "in progress". armGame() (called
+        // once an opponent joins) swaps this for seat-only cleanup.
+        odRemove('rooms/' + id);
+        if (pub) odRemove('lobby/' + id);
+        return { roomId: id, color: 'white', ref: ref };
+      });
     });
   }
 
@@ -130,6 +150,18 @@
         });
       });
     });
+  }
+
+  // Call once a game is actually under way (both seats taken). A mid-game drop
+  // should only vacate that player's own seat — never destroy a live match — so
+  // we cancel the host's whole-room remove and arm a seat-level remove instead.
+  // The lobby ad (a full game) is still cleared on disconnect.
+  function armGame(ref, color) {
+    if (!ref) return;
+    var id = ref.key;
+    odCancel('rooms/' + id);                 // don't nuke a live game on a blip
+    odRemove('rooms/' + id + '/players/' + color);
+    odRemove('lobby/' + id);
   }
 
   // Watch a room without claiming a seat (spectator). Returns {roomId, ref}.
@@ -213,6 +245,8 @@
   function leaveRoom(ref) {
     if (!ref) return Promise.resolve();
     var me = clientId(), id = ref.key;
+    odCancel('rooms/' + id); odCancel('rooms/' + id + '/players/white');
+    odCancel('rooms/' + id + '/players/black'); odCancel('lobby/' + id);
     return ref.once('value').then(function (snap) {
       if (!snap.exists()) return;
       return ref.transaction(function (room) {
@@ -234,7 +268,7 @@
     configured: configured, clientId: clientId,
     createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
     onState: onState, pushState: pushState,
-    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom,
+    onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom, armGame: armGame,
     startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms
   };
 })();
