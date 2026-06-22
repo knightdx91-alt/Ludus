@@ -120,7 +120,13 @@
       var inFac = OPPONENTS.filter(function (o) { return o.faction === fac; });
       if (!inFac.length) return;
       var g = document.createElement('div'); g.className = 'opp-group';
-      g.innerHTML = '<h3>' + fac + '</h3>';
+      // Alera (the largest group) starts open; the rest collapse to cut clutter.
+      if (fac !== 'Alera') g.classList.add('collapsed');
+      var h = document.createElement('h3');
+      h.innerHTML = '<span class="caret">▼</span><span>' + fac + '</span>' +
+        '<span class="count">' + inFac.length + '</span>';
+      h.onclick = function () { g.classList.toggle('collapsed'); };
+      g.appendChild(h);
       var grid = document.createElement('div'); grid.className = 'opp-grid';
       inFac.forEach(function (o) {
         var b = document.createElement('button'); b.className = 'opp-card';

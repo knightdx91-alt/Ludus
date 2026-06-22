@@ -32,7 +32,13 @@
   /* opponent picker */
   .opp-group { margin-bottom:22px; }
   .opp-group h3 { font-size:12px; letter-spacing:2px; text-transform:uppercase; color:var(--cold);
-    margin:0 0 10px; border-bottom:1px solid #243140; padding-bottom:6px; }
+    margin:0 0 10px; border-bottom:1px solid #243140; padding-bottom:6px;
+    cursor:pointer; display:flex; align-items:center; gap:8px; user-select:none; }
+  .opp-group h3:hover { color:#eaf2ff; }
+  .opp-group h3 .caret { transition:transform .15s; font-size:10px; }
+  .opp-group h3 .count { margin-left:auto; opacity:.6; letter-spacing:1px; }
+  .opp-group.collapsed h3 .caret { transform:rotate(-90deg); }
+  .opp-group.collapsed .opp-grid { display:none; }
   .opp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:12px; }
   .opp-card { text-align:left; background:#0f1620; border:1px solid #243140; border-radius:10px;
     padding:14px; transition:border-color .15s, transform .1s; }
