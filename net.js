@@ -327,10 +327,10 @@
         durationMs: res.durationMs || 0,
         at: Date.now()
       });
-    }).catch(function () {});
+    }).catch(function () {});  // a lost leaderboard write shouldn't disrupt play
   }
-  // Subscribe to recent results (newest first). cb(list). Returns unsubscribe fn.
-  function onResults(cb, limit) {
+  // Subscribe to recent results (newest first). cb(list); optional errCb(err).
+  function onResults(cb, limit, errCb) {
     limit = limit || 25;
     var ref = null;
     init().then(function () {
@@ -340,21 +340,24 @@
         snap.forEach(function (c) { var r = c.val() || {}; r.id = c.key; out.push(r); });
         out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
         cb(out.slice(0, limit));
-      });
-    }).catch(function () {});
+      }, function (err) { if (errCb) errCb(err); });
+    }).catch(function (err) { if (errCb) errCb(err); });
     return function () { if (ref) try { ref.off('value'); } catch (e) {} };
   }
 
   // ---- message board (messages/{id}) -----------------------------------
+  // Returns a promise that REJECTS on failure (so the UI can show why). The
+  // caller decides whether to surface it.
   function postMessage(name, text) {
     text = String(text || '').trim().slice(0, 280);
     if (!text) return Promise.resolve();
     return init().then(function () {
       return db.ref('messages/' + genId()).set({ name: String(name || 'Anon').slice(0, 24), text: text, at: Date.now() });
-    }).catch(function () {});
+    });
   }
-  // Subscribe to the message board (oldest→newest, last `limit`). Returns unsub fn.
-  function onMessages(cb, limit) {
+  // Subscribe to the message board (oldest→newest, last `limit`). cb(list); optional
+  // errCb(err) fires if the read is denied. Returns unsub fn.
+  function onMessages(cb, limit, errCb) {
     limit = limit || 50;
     var ref = null;
     init().then(function () {
@@ -364,8 +367,8 @@
         snap.forEach(function (c) { var m = c.val() || {}; m.id = c.key; out.push(m); });
         out.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
         cb(out.slice(-limit));
-      });
-    }).catch(function () {});
+      }, function (err) { if (errCb) errCb(err); });
+    }).catch(function (err) { if (errCb) errCb(err); });
     return function () { if (ref) try { ref.off('value'); } catch (e) {} };
   }
 

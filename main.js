@@ -423,9 +423,16 @@
     } else { note.style.display = 'none'; }
     $('boardsOverlay').classList.add('open');
     if (NET.configured()) {
-      if (!unsubLeader) unsubLeader = NET.onResults(renderLeader);
-      if (!unsubMsg) unsubMsg = NET.onMessages(renderMsgs);
+      if (!unsubLeader) unsubLeader = NET.onResults(renderLeader, 25, boardsError);
+      if (!unsubMsg) unsubMsg = NET.onMessages(renderMsgs, 50, boardsError);
     }
+  }
+  // Show why the Hall can't read/write — almost always missing DB rules.
+  function boardsError(err) {
+    var note = $('boardsNote'), msg = (err && err.message) || String(err);
+    if (/permission|denied/i.test(msg)) msg = 'the Realtime Database rules don’t allow it yet — publish the results/ and messages/ rules from LUDUS.md in your Firebase console.';
+    note.textContent = 'Hall unavailable: ' + msg;
+    note.style.display = 'block';
   }
   function closeBoards() {
     $('boardsOverlay').classList.remove('open');
@@ -452,8 +459,9 @@
     if (!NET.configured()) { alert('Online play is not configured yet (ludus/firebase-config.js), so the message board is offline.'); return; }
     var t = $('msgInput').value;
     if (!t.trim()) return;
-    NET.postMessage(NET.playerName() || 'Anon', t);
-    $('msgInput').value = '';
+    NET.postMessage(NET.playerName() || 'Anon', t)
+      .then(function () { $('msgInput').value = ''; })
+      .catch(boardsError);
   }
 
   function init() {
