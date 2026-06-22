@@ -29,11 +29,11 @@ broken skyboard mapping and underspecified rules.
 ## Pieces (22 per side)
 | Type | Tag | Count | Aerial | Value |
 |------|-----|------:|:------:|------:|
-| Legionnaire | L | 11 | no | 1 |
-| Veteran Legionnaire | VL | (promoted) | no | 2 |
+| Legionare | L | 11 | no | 1 |
+| Veteran Legionare | VL | (promoted) | no | 2 |
 | Knight Flora | KF | 2 | no | 3 |
 | Knight Terra | KT | 2 | no | 3 |
-| Knight Ignis | KI | 2 | no | 3 |
+| Knight Ignus | KI | 2 | no | 3 |
 | Knight Aeris | KA | 2 | yes | 4 |
 | High Lord | HL | 2 | yes | 6 |
 | Cursor | CU | 2 | no | 3 |
@@ -47,8 +47,8 @@ rival a First Lord. Both sit on a third rank flanking the First Lord's file (24 
 
 ### Starting layout (both sides mirror)
 - Back rank: `KA KT KI KF HL FL HL KF KI KT KA` (11 across).
-- Rank in front: 11 Legionnaires.
-- White: rows 10 (back) & 9 (legionnaires). Black: rows 0 (back) & 1 (legionnaires).
+- Rank in front: 11 Legionares.
+- White: rows 10 (back) & 9 (legionares). Black: rows 0 (back) & 1 (legionares).
 
 ## Turn structure
 One **action** per turn: a piece either **moves** (and captures by landing on an enemy —
@@ -61,17 +61,17 @@ a tractable AI. The First Lord is a **king**: when it is captured the game ends 
 Lord hanging. This keeps move generation simple and the AI fast.)
 
 ## Movement & attacks
-- **Legionnaire (L)** — moves 1 square **forward / left / right** (not back, not diagonal);
+- **Legionare (L)** — moves 1 square **forward / left / right** (not back, not diagonal);
   may move **2 forward on its first move**. Captures **forward-diagonally only**. On reaching
   the far back rank it promotes to **Veteran**.
-- **Veteran Legionnaire (VL)** — moves/captures 1 square in **any** of the 8 directions.
+- **Veteran Legionare (VL)** — moves/captures 1 square in **any** of the 8 directions.
 - **Knight Flora (KF)** — slides up to **2 squares diagonally** (blocked by pieces); captures
   by landing. *Woodcraft:* may instead **attack** an enemy up to 2 diagonal squares away
   (line-of-sight) without moving.
 - **Knight Terra (KT)** — moves like a **chess knight** (2+1 L-shape, may jump). *Terracraft:*
   may instead **attack** an orthogonally-adjacent enemy; if a second enemy sits directly
   behind the first (same line), it is **also** removed (the earth ripples through).
-- **Knight Ignis (KI)** — moves up to **2 squares orthogonally** (blocked by pieces). *Firecraft:*
+- **Knight Ignus (KI)** — moves up to **2 squares orthogonally** (blocked by pieces). *Firecraft:*
   may instead **attack** an enemy up to 2 squares away orthogonally (line-of-sight).
 - **Knight Aeris (KA)** — moves **2 squares any direction** on the ground; may **fly** to the
   sky (when standing under the central 5×5) or land from sky, as its action; on the sky moves
@@ -79,12 +79,12 @@ Lord hanging. This keeps move generation simple and the AI fast.)
 - **High Lord (HL)** — moves **2 any direction** on ground; may **fly**; sky move 1 any
   direction; lands by capture onto its shadowed ground square. *Furycraft (all crafts except
   Flora's):* may instead make an **orthogonal ranged strike to range 2 that pierces** the enemy
-  directly behind the first target — combining Ignis's reach with Terra's pierce.
+  directly behind the first target — combining Ignus's reach with Terra's pierce.
 - **First Lord (FL)** — like HL, moves 2 any direction / flies / sky move 1. **If captured,
   the game ends.**
 
 ## Deferred (future passes)
-- **Shieldwall** (multi-Legionnaire single-move), full furycraft variety per Knight, latrunculorum
+- **Shieldwall** (multi-Legionare single-move), full furycraft variety per Knight, latrunculorum
   flanking capture as an alt mode, "check" legality. v1 omits these for balance + a tractable AI.
 
 ## Code map

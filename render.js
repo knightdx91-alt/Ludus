@@ -172,7 +172,7 @@
           } else if (a.to.board === cell.board && a.to.r === cell.r && a.to.c === cell.c) { moveAct = a; }
         }
         // Both a move-capture and a furycraft strike land on this square → let the
-        // player choose instead of silently picking one (Knight Flora/Ignis etc.).
+        // player choose instead of silently picking one (Knight Flora/Ignus etc.).
         if (moveAct && atkAct) { showChooser(ev.clientX, ev.clientY, moveAct, atkAct); return; }
         if (moveAct) { commit(moveAct); return; }
         if (atkAct) { commit(atkAct); return; }
