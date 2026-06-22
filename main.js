@@ -459,9 +459,13 @@
     if (!NET.configured()) { alert('Online play is not configured yet (ludus/firebase-config.js), so the message board is offline.'); return; }
     var t = $('msgInput').value;
     if (!t.trim()) return;
-    NET.postMessage(NET.playerName() || 'Anon', t)
-      .then(function () { $('msgInput').value = ''; })
-      .catch(boardsError);
+    var note = $('boardsNote');
+    note.style.display = 'block'; note.style.color = ''; note.textContent = 'Posting…';
+    NET.postMessage(NET.playerName() || 'Anon', t).then(function () {
+      $('msgInput').value = '';
+      note.style.color = '#8fe39a'; note.textContent = 'Posted ✓';
+      setTimeout(function () { if (note.textContent === 'Posted ✓') { note.style.display = 'none'; note.style.color = ''; } }, 2500);
+    }).catch(boardsError);
   }
 
   function init() {
