@@ -190,20 +190,32 @@
     function showChooser(clientX, clientY, moveAct, atkAct) {
       closeChooser();
       var m = document.createElement('div');
-      m.style.cssText = 'position:fixed;z-index:9999;left:' + clientX + 'px;top:' + clientY +
-        'px;background:#1b2530;border:1px solid #3a5a7a;border-radius:8px;padding:6px;' +
-        'display:flex;flex-direction:column;gap:4px;box-shadow:0 6px 20px rgba(0,0,0,.55)';
+      // Start hidden at (0,0) so we can measure it, then clamp fully into the
+      // viewport — without this an edge tap (common on a narrow phone) would put
+      // the menu off-screen and it would seem to "not show".
+      m.style.cssText = 'position:fixed;z-index:9999;left:0;top:0;visibility:hidden;' +
+        'background:#1b2530;border:1px solid #3a5a7a;border-radius:8px;padding:8px;' +
+        'display:flex;flex-direction:column;gap:8px;box-shadow:0 6px 20px rgba(0,0,0,.55)';
       function btn(label, act) {
         var b = document.createElement('button');
         b.textContent = label;
-        b.style.cssText = 'cursor:pointer;border:0;border-radius:6px;padding:7px 12px;' +
-          'font:13px/1.2 monospace;background:#274058;color:#eaf2ff;white-space:nowrap';
+        // larger tap targets for touch.
+        b.style.cssText = 'cursor:pointer;border:0;border-radius:6px;padding:11px 16px;' +
+          'font:14px/1.2 monospace;background:#274058;color:#eaf2ff;white-space:nowrap';
         b.onclick = function (e) { e.stopPropagation(); commit(act); };
+        b.addEventListener('touchend', function (e) { e.preventDefault(); e.stopPropagation(); commit(act); });
         return b;
       }
       m.appendChild(btn('⚔ Move & capture', moveAct));
       m.appendChild(btn('✷ Furycraft strike', atkAct));
       document.body.appendChild(m);
+      // clamp into the visible viewport; prefer showing it just above the finger.
+      var r = m.getBoundingClientRect(), pad = 8;
+      var vw = window.innerWidth, vh = window.innerHeight;
+      var x = Math.max(pad, Math.min(clientX - r.width / 2, vw - r.width - pad));
+      var y = clientY - r.height - 14;            // above the tap, clear of the finger
+      if (y < pad) y = Math.min(clientY + 16, vh - r.height - pad);
+      m.style.left = x + 'px'; m.style.top = y + 'px'; m.style.visibility = 'visible';
       chooserEl = m;
     }
 
