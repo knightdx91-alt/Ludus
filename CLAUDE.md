@@ -17,12 +17,28 @@ node test_ludus.mjs  # game engine + AI
 
 ## Layout
 
-- `engine.js` — pure game rules/state (`window.Ludus`).
-- `ai.js` — bot move selection (`window.LudusAI`).
-- `net.js` — Firebase Realtime DB rooms, lobby index, presence (`window.LudusNet`).
-- `render.js` — canvas board + input (`window.LudusUI`).
-- `main.js` — screen flow + game controller wiring it all together.
+- `engine.js` — pure game rules/state (`window.Ludus`). 24 pieces/side incl. the
+  Cursor (CU, glides ≤4) and Steadholder (SH, steps 1, doubles adjacent support).
+  `evaluate(state,color,weights)` takes personality weights; `clone` is a fast
+  structural clone (the AI's hot path); `firstLordAttacked` powers king-safety.
+- `ai.js` — bot move selection (`window.LudusAI`). easy/medium/hard, plus a
+  per-opponent `PERSONA` table (sky/advance/support/danger/ownDanger/jitter/
+  furyBias) so each foe plays to character. King-safety is applied at the
+  decision **root** (not deep leaves) to stay fast; `chooseAction(state,color,
+  difficulty,personaId)`.
+- `net.js` — Firebase Realtime DB rooms, lobby index, presence, plus the Hall of
+  Records: `results/` (leaderboard: who beat whom + durationMs) and `messages/`
+  (public board), and a localStorage player handle (`window.LudusNet`).
+- `render.js` — canvas board + input (`window.LudusUI`). Captured-piece tray
+  under the sky board; a move-capture vs furycraft-strike chooser popup; a
+  show-legal-moves toggle (`setShowMoves`).
+- `main.js` — screen flow + game controller. Collapsible faction groups on the
+  title; in-game elapsed clock; Hall overlay; one-time name prompt at first game.
 - `index.html` — single-page shell; `firebase-config.js` holds the DB config.
+  `__CACHE_BUST__` in HTML is replaced with the commit SHA by the Pages workflow.
+
+The shared rules JSON (incl. `results`/`messages` nodes) lives in `LUDUS.md`;
+publish it in the Firebase console or the Hall reads/writes are denied.
 
 Online rooms self-clean via Firebase `onDisconnect`: an abandoned lobby room
 (host closed the tab) removes itself and its `lobby/` ad; a mid-game drop only
