@@ -16,7 +16,7 @@
   // piece values for AI eval; FL is effectively infinite (king).
   // CU = Cursor (fast courier/scout), SH = Steadholder (defensive anchor). Per the
   // Books 3-4 line, a Cursor + Steadholder together rival a First Lord's worth.
-  var VALUE = { L: 1, VL: 2, KF: 3, KT: 3, KI: 3, KA: 4, HL: 6, CU: 3, SH: 2, FL: 1000 };
+  var VALUE = { L: 1, VL: 2, KF: 3, KT: 3, KI: 3, KR: 4, KA: 4, HL: 6, CU: 3, SH: 2, FL: 1000 };
   var AERIAL = { KA: 1, HL: 1, FL: 1 };
 
   function inGround(r, c) { return r >= 0 && r < GROUND && c >= 0 && c < GROUND; }
@@ -72,9 +72,12 @@
       add('L', 'white', GROUND - 2, c);
       add(back[c], 'white', GROUND - 1, c);
     }
-    // Cursor + Steadholder flank the First Lord's file, a rank behind the legionnaires.
+    // Cursor + Steadholder flank the First Lord's file, a rank behind the legionares,
+    // bracketed by the two Knights Ferrous (the armored metalcrafters).
     add('CU', 'black', 2, 4); add('SH', 'black', 2, 6);
+    add('KR', 'black', 2, 3); add('KR', 'black', 2, 7);
     add('CU', 'white', GROUND - 3, 4); add('SH', 'white', GROUND - 3, 6);
+    add('KR', 'white', GROUND - 3, 3); add('KR', 'white', GROUND - 3, 7);
     // captured[color] = pieces that `color` has taken (for the captured tray).
     return { pieces: pieces, turn: 'white', winner: null, moveCount: 0, captured: { white: [], black: [] } };
   }
@@ -109,10 +112,11 @@
         var occ = pieceAt(state, 'ground', r, c);
         if (!occ) continue;
         if (occ.color === p.color) break; // own piece blocks
+        if (occ.type === 'KR') break;     // metalcraft ward: a Ferrous can't be struck by furycraft (and stops the strike)
         var targets = [occ.id];
         if (pierce) {
           var br = r + dr, bc = c + dc, behind = inGround(br, bc) ? pieceAt(state, 'ground', br, bc) : null;
-          if (behind && behind.color !== p.color) targets.push(behind.id);
+          if (behind && behind.color !== p.color && behind.type !== 'KR') targets.push(behind.id);
         }
         out.push({ pieceId: p.id, type: 'attack', to: { board: 'ground', r: p.r, c: p.c }, targets: targets });
         break; // first enemy hit
@@ -185,6 +189,7 @@
         }
         rangedAttack(state, p, ORTHO, 1, out, true); break;
       case 'KI': slide(state, p, ORTHO, 2, out); rangedAttack(state, p, ORTHO, 2, out, false); break;
+      case 'KR': slide(state, p, ALL8, 2, out); break;        // ferrous: armored advance 2 any dir; warded vs furycraft
       case 'KA': slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out); break;
       case 'HL':
         slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out);

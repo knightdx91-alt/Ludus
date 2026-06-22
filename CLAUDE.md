@@ -17,8 +17,9 @@ node test_ludus.mjs  # game engine + AI
 
 ## Layout
 
-- `engine.js` — pure game rules/state (`window.Ludus`). 24 pieces/side incl. the
-  Cursor (CU, glides ≤4) and Steadholder (SH, steps 1, doubles adjacent support).
+- `engine.js` — pure game rules/state (`window.Ludus`). 26 pieces/side incl. the
+  Cursor (CU, glides ≤4), Steadholder (SH, steps 1, doubles adjacent support), and
+  Knight Ferrous (KR, slides ≤2 any dir, warded against all furycraft strikes).
   `evaluate(state,color,weights)` takes personality weights; `clone` is a fast
   structural clone (the AI's hot path); `firstLordAttacked` powers king-safety.
 - `ai.js` — bot move selection (`window.LudusAI`). easy/medium/hard, plus a

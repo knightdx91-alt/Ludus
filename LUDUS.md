@@ -26,7 +26,7 @@ broken skyboard mapping and underspecified rules.
   A piece on sky `(r,c)` "shadows" ground `(r+3,c+3)` 1:1 — no ambiguous 4→1 tiling.
 - Only **aerial** pieces (Knight Aeris, High Lord, First Lord) may occupy the sky.
 
-## Pieces (22 per side)
+## Pieces (26 per side)
 | Type | Tag | Count | Aerial | Value |
 |------|-----|------:|:------:|------:|
 | Legionare | L | 11 | no | 1 |
@@ -34,6 +34,7 @@ broken skyboard mapping and underspecified rules.
 | Knight Flora | KF | 2 | no | 3 |
 | Knight Terra | KT | 2 | no | 3 |
 | Knight Ignus | KI | 2 | no | 3 |
+| Knight Ferrous | KR | 2 | no | 4 |
 | Knight Aeris | KA | 2 | yes | 4 |
 | High Lord | HL | 2 | yes | 6 |
 | Cursor | CU | 2 | no | 3 |
@@ -43,7 +44,8 @@ broken skyboard mapping and underspecified rules.
 **Cursor (CU)** glides up to 4 squares any direction (captures by landing); a swift
 scout/courier (Books 3-4). **Steadholder (SH)** steps 1 any direction and doubles the
 support of friendly pieces beside it; per Gaius's line, a Cursor + Steadholder together
-rival a First Lord. Both sit on a third rank flanking the First Lord's file (24 pieces/side).
+rival a First Lord. They share a third rank — flanked by the two **Knights Ferrous (KR)** —
+just behind the legionares (26 pieces/side).
 
 ### Starting layout (both sides mirror)
 - Back rank: `KA KT KI KF HL FL HL KF KI KT KA` (11 across).
@@ -73,6 +75,10 @@ Lord hanging. This keeps move generation simple and the AI fast.)
   behind the first (same line), it is **also** removed (the earth ripples through).
 - **Knight Ignus (KI)** — moves up to **2 squares orthogonally** (blocked by pieces). *Firecraft:*
   may instead **attack** an enemy up to 2 squares away orthogonally (line-of-sight).
+- **Knight Ferrous (KR)** — the armored metalcrafter: slides up to **2 squares in any
+  direction** (blocked by pieces), capturing by landing. *Metalcraft ward:* it **cannot be
+  targeted by any furycraft ranged strike** (Flora/Terra/Ignus/High Lord attacks pass it by,
+  and it blocks the strike's line); it can only be removed by a move-capture.
 - **Knight Aeris (KA)** — moves **2 squares any direction** on the ground; may **fly** to the
   sky (when standing under the central 5×5) or land from sky, as its action; on the sky moves
   **1 square any direction**. A sky piece may attack/land on the ground square it shadows.

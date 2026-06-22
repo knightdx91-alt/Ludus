@@ -22,7 +22,7 @@
   var LIGHT = '#d9c4a3', DARK = '#9a7b4f', SKYL = '#3a5a7a', SKYD = '#26415c';
   var SEL = 'rgba(90,200,255,0.55)', DEST = 'rgba(120,255,160,0.45)', CAP = 'rgba(255,90,90,0.55)';
   var SHADOW = 'rgba(90,200,255,0.12)';
-  var GLYPH = { L: 'L', VL: 'V', KF: 'F', KT: 'T', KI: 'I', KA: 'A', HL: 'H', CU: 'C', SH: 'S', FL: '★' };
+  var GLYPH = { L: 'L', VL: 'V', KF: 'F', KT: 'T', KI: 'I', KR: 'R', KA: 'A', HL: 'H', CU: 'C', SH: 'S', FL: '★' };
 
   function create(opts) {
     var canvas = opts.canvas, onAction = opts.onAction;
@@ -75,7 +75,7 @@
       // labels
       ctx.fillStyle = '#cfe3ff'; ctx.font = '11px monospace'; ctx.textAlign = 'left';
       ctx.fillText('GROUND 11×11', GRD_X, GRD_Y - 4);
-      ctx.fillText('SKY 5×5 (over centre)', SKY_X, SKY_Y - 4);
+      ctx.fillText('SKY-BOARD 5×5 (over centre)', SKY_X, SKY_Y - 4);
 
       // highlights for selected piece's actions
       if (selected) {
