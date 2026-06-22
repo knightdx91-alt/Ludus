@@ -624,8 +624,10 @@
       });
 
       // Click the count to expand a roster of who's online (names people picked
-      // for the leaderboard; unnamed clients show as "Anonymous").
-      var online = [];
+      // for the leaderboard; unnamed clients show as "Anonymous"). Anyone who is
+      // sharing a game (a broadcast room they host) gets a Watch button so you
+      // can jump straight into spectating from here.
+      var online = [], casts = {};   // casts: hostId -> broadcast room id
       var renderRoster = function () {
         var list = $('onlineList');
         if (!list) return;
@@ -635,12 +637,34 @@
           var name = (p.name || '').trim() || 'Anonymous';
           name = name.replace(/[<>&]/g, '');                 // basic escaping
           var mine = p.id === me ? ' <span style="color:#7d8a93">(you)</span>' : '';
-          return '<div style="padding:4px 14px;white-space:nowrap">● ' + name + mine + '</div>';
+          // Offer Watch when this person is broadcasting (but not for yourself —
+          // you're already in your own game).
+          var room = p.id !== me ? casts[p.id] : null;
+          var watch = room
+            ? '<button class="ghost" data-watch="' + room + '" title="Watch this player\'s game" '
+              + 'style="margin-left:8px;padding:1px 8px;font-size:11px">📡 Watch</button>'
+            : '';
+          return '<div style="padding:4px 14px;white-space:nowrap;display:flex;align-items:center;justify-content:space-between;gap:8px">'
+            + '<span>● ' + name + mine + '</span>' + watch + '</div>';
         }).join('');
       };
       NET.onOnline(function (list) {
         online = list.slice().sort(function (a, b) { return (a.name || '~').localeCompare(b.name || '~'); });
         if ($('onlineList').style.display !== 'none') renderRoster();
+      });
+      // Track live broadcasts so the roster knows who's watchable.
+      NET.onRooms(function (rooms) {
+        casts = {};
+        rooms.forEach(function (r) { if (r.broadcast && r.host) casts[r.host] = r.id; });
+        if ($('onlineList').style.display !== 'none') renderRoster();
+      });
+      // Clicking a roster Watch button jumps into spectating that game.
+      $('onlineList').addEventListener('click', function (e) {
+        var b = e.target.closest && e.target.closest('[data-watch]');
+        if (!b) return;
+        $('onlineList').style.display = 'none';
+        stopRooms();                     // close the lobby feed if it was open
+        spectateOnline(b.getAttribute('data-watch'));
       });
       $('onlineCount').onclick = function () {
         var list = $('onlineList');
