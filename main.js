@@ -42,6 +42,7 @@
   var currentOpponent = null, currentSide = 'white';
   var net = null, unsub = null, unsubPlayers = null, applying = false, unsubRooms = null;
   var unsubAway = null, awayTimer = null, awayUntil = 0;
+  var castRef = null, casting = false;              // broadcasting a local game for spectators
   var gameStart = 0, gameRecorded = false;          // for the Hall of Records
   var unsubLeader = null, unsubMsg = null, clockTimer = null;
 
@@ -105,6 +106,7 @@
       NET.clearAway(net.ref);
       leaveOnline();
     } else teardownNet();
+    stopBroadcast(true);
     mode = null; sessionActive = false; lastSessionScreen = null;
   }
   // Intentional, immediate exit (menu buttons): no grace, nothing to resume.
@@ -159,6 +161,7 @@
   function beginLocal(m, hc, perspective, label) {
     ensureName();
     teardownNet();
+    stopBroadcast(true); // a new game ends any broadcast from the previous one
     net = null; mode = m; humanColors = hc;
     state = E.initialState();
     $('oppLabel').innerHTML = label;
@@ -169,6 +172,7 @@
     gameStart = Date.now(); gameRecorded = false;
     startClock();
     showScreen('screenGame');
+    updateWatchUI();
     loop();
   }
 
@@ -210,7 +214,53 @@
     });
   }
 
+  // ---- broadcast a local (bot / pass-and-play) game for spectators ------
+  // Opt-in: the player presses "Let others watch", which mirrors the local
+  // board into a spectate-only room and keeps it in sync on every move.
+  function broadcastLabel() {
+    var me = NET.playerName() || 'A challenger';
+    if (mode === 'bot') return me + ' vs ' + (currentOpponent ? currentOpponent.name : 'the bot');
+    if (mode === 'hotseat') return me + ' — pass & play';
+    return me + "'s game";
+  }
+  function startBroadcast() {
+    if (casting || !NET.configured()) return;
+    var btn = $('btnWatch'); if (btn) { btn.disabled = true; btn.textContent = '📡 Starting…'; }
+    NET.createBroadcast(state, broadcastLabel()).then(function (room) {
+      castRef = room.ref; casting = true;
+      updateWatchUI();
+    }).catch(function () {
+      casting = false; castRef = null; updateWatchUI();
+      if (btn) btn.disabled = false;
+      alert('Could not start sharing — check your connection / Firebase rules.');
+    });
+  }
+  function stopBroadcast(silent) {
+    casting = false;
+    var ref = castRef; castRef = null;
+    if (ref) NET.leaveRoom(ref); // deletes the spectate-only room (no other occupants)
+    if (!silent) updateWatchUI();
+  }
+  function syncBroadcast() {
+    if (casting && castRef) NET.pushState(castRef, state).catch(function () {});
+  }
+  function updateWatchUI() {
+    var btn = $('btnWatch'); if (!btn) return;
+    // Only offer sharing for local games you control, when online is configured.
+    var canShare = NET.configured() && (mode === 'bot' || mode === 'hotseat') && !(state && state.winner);
+    btn.style.display = canShare || casting ? '' : 'none';
+    btn.disabled = false;
+    if (casting) {
+      btn.textContent = '📡 Sharing — room ' + (castRef ? castRef.key : '') + ' · Stop';
+      btn.title = 'Others can watch via the lobby. Click to stop sharing.';
+    } else {
+      btn.textContent = '📡 Let others watch';
+      btn.title = 'Publish this game so others can watch it live from the lobby';
+    }
+  }
+
   function loop() {
+    syncBroadcast();
     ui.render(state);
     if (state.winner) {
       var youWin = humanColors[state.winner];
@@ -219,6 +269,7 @@
       if (mode === 'spectate') setStatus(state.winner.toUpperCase() + ' wins — captured the First Lord.');
       else setStatus((mode === 'hotseat' ? state.winner.toUpperCase() + ' wins' : (youWin ? 'Victory — you' : 'Defeat — your foe') + ' captured the First Lord') + '.');
       ui.setInteractive(false);
+      updateWatchUI(); // the final board is pushed (above); switch button to "Stop"
       return;
     }
     var humanTurn = !!humanColors[state.turn];
@@ -309,7 +360,9 @@
       row(r, '<b>Open</b> — waiting for a player · <span class="rj">Join ›</span>', function () { stopRooms(); joinOnline(r.id); });
     });
     live.forEach(function (r) {
-      row(r, 'In progress · <span class="rj">Watch ›</span>', function () { stopRooms(); spectateOnline(r.id); });
+      var what = r.broadcast ? (r.label ? esc(r.label) : 'Bot game') + ' · <span class="rj">Watch ›</span>'
+                             : 'In progress · <span class="rj">Watch ›</span>';
+      row(r, what, function () { stopRooms(); spectateOnline(r.id); });
     });
   }
 
@@ -498,10 +551,12 @@
     // game-screen tools
     $('btnNewGame').onclick = function () {
       stopClock();
+      stopBroadcast(true);
       if (mode === 'online') leaveOnline(); else teardownNet();
       $('roomBox').style.display = 'none';
       showScreen('screenTitle');
     };
+    $('btnWatch').onclick = function () { if (casting) stopBroadcast(); else startBroadcast(); };
     $('btnFlip').onclick = function () {
       var next = $('btnFlip').dataset.p === 'black' ? 'white' : 'black';
       $('btnFlip').dataset.p = next; ui.setPerspective(next);

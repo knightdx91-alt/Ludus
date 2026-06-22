@@ -100,9 +100,13 @@ The DB has three top-level nodes:
 - `rooms/{id}` — `{ state, players:{white,black}, public, created, updated }`. The full
   game state. The rules allow reading **one room at a time** (by id) so joiners and
   spectators can subscribe, but not bulk-listing every game. Empty rooms self-delete on leave.
-- `lobby/{id}` — `{ open, full, host, updated }`. A lightweight, publicly-listable index
-  of `public` rooms (no game state) that powers the **Open Games** lobby: Join an open
-  seat, or **Watch** a full game as a spectator. Kept in sync by create/join/leave.
+- `lobby/{id}` — `{ open, full, host, updated, broadcast?, label? }`. A lightweight,
+  publicly-listable index of `public` rooms (no game state) that powers the **Open Games**
+  lobby: Join an open seat, or **Watch** a full game as a spectator. Kept in sync by
+  create/join/leave. A `broadcast` entry is a local game (vs the bot, or pass-and-play)
+  the player opted to share via "Let others watch": it's advertised full (spectate-only,
+  not joinable — `players.black` is a literal `'bot'`) with an optional `label`, and the
+  host pushes state on every move (`createBroadcast`). Host disconnect tears it down.
 - `presence/{clientId}` — `{name, at}` written while a client is connected (via
   `.info/connected` + `onDisconnect().remove()`); the header **online count** is this
   node's child count, and clicking it expands a roster of the connected players' names.

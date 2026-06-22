@@ -200,6 +200,27 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   try { await C.spectate('ZZZZZ'); } catch (e) { specMissing = /not found/i.test(e.message); }
   ok('spectate of unknown room rejected', specMissing === true);
 
+  // --- broadcast: a local game is published spectate-only, watchable, unjoinable ---
+  let castLobby = [];
+  const unsubCast = A.onRooms(function (rooms) { castLobby = rooms; });
+  const cast = await A.createBroadcast({ move: 0, board: 'start' }, 'Pyron vs the Realm');
+  await Promise.resolve();
+  ok('broadcast appears in lobby as full + broadcast', castLobby.some(function (r) {
+    return r.id === cast.roomId && r.full && r.broadcast && r.label === 'Pyron vs the Realm';
+  }));
+  ok('broadcast is not advertised as open/joinable', !castLobby.some(function (r) { return r.id === cast.roomId && r.open; }));
+  let castSpec = null;
+  const cs = await C.spectate(cast.roomId);
+  const unsubCs = C.onState(cs.ref, function (s) { castSpec = s; });
+  await A.pushState(cast.ref, { move: 1, board: 'after-move' });
+  await Promise.resolve();
+  ok('spectator follows the broadcast', castSpec && castSpec.move === 1);
+  let castJoinRejected = false;
+  try { await B.joinRoom(cast.roomId); } catch (e) { castJoinRejected = /full/i.test(e.message); }
+  ok('broadcast room rejects a would-be player', castJoinRejected === true);
+  unsubCs(); unsubCast();
+  await A.leaveRoom(cast.ref);
+
   // --- lobby listing: public rooms surface; private ones stay hidden ---
   let lobby = [];
   const unsubRooms = A.onRooms(function (rooms) { lobby = rooms; });

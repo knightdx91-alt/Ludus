@@ -111,6 +111,36 @@
     });
   }
 
+  // Broadcast a LOCAL game (vs the bot, or pass-and-play) so others can watch
+  // it. There's no opponent seat to fill — the room is spectate-only — so we
+  // advertise it as a live game (open:false, full:true) and mark it broadcast
+  // so the lobby can label it. The host pushes state on every move via
+  // pushState(); when the host's tab drops, onDisconnect tears the whole thing
+  // down (room + lobby ad) since a broadcast with no host is just a frozen board.
+  // `label` is a short caption shown in the lobby (e.g. "Pyron vs the Realm").
+  // Returns {roomId, ref}.
+  function createBroadcast(initialState, label) {
+    return init().then(function () {
+      var id = randomRoomId(), ref = db.ref('rooms/' + id);
+      return ref.set({
+        state: initialState,
+        players: { white: clientId(), black: 'bot' }, // both "taken" → not joinable
+        public: true, broadcast: true,
+        created: Date.now(), updated: Date.now()
+      }).then(function () {
+        return db.ref('lobby/' + id).set({
+          open: false, full: true, broadcast: true,
+          label: String(label || '').slice(0, 48),
+          host: clientId(), updated: Date.now()
+        }).catch(function () {});
+      }).then(function () {
+        odRemove('rooms/' + id);   // host gone → end the broadcast
+        odRemove('lobby/' + id);
+        return { roomId: id, ref: ref };
+      });
+    });
+  }
+
   // Reflect a room's seat status into its lobby entry (if it has one — private
   // rooms don't). Removes the entry when the room is gone.
   function syncLobby(id, players) {
@@ -269,7 +299,8 @@
           var r = child.val() || {};
           out.push({
             id: child.key, host: r.host || null,
-            open: !!r.open, full: !!r.full, updated: r.updated || 0
+            open: !!r.open, full: !!r.full, updated: r.updated || 0,
+            broadcast: !!r.broadcast, label: r.label || ''
           });
         });
         out.sort(function (a, b) { return b.updated - a.updated; });
@@ -403,7 +434,7 @@
     submitResult: submitResult, onResults: onResults,
     postMessage: postMessage, onMessages: onMessages,
     configured: configured, clientId: clientId,
-    createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
+    createRoom: createRoom, createBroadcast: createBroadcast, joinRoom: joinRoom, spectate: spectate,
     onState: onState, pushState: pushState,
     onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom, armGame: armGame,
     setAway: setAway, clearAway: clearAway, onAway: onAway,
