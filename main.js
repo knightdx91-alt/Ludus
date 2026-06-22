@@ -9,14 +9,22 @@
   // Opponents from across the Realm. Difficulty maps to the AI strength.
   var OPPONENTS = [
     { id: 'max', name: 'Antillar Maximus', faction: 'Alera', difficulty: 'easy', blurb: 'Brash and fearless — he plays on instinct, not patience.' },
+    { id: 'amara', name: 'Amara', faction: 'Alera', difficulty: 'medium', blurb: 'A Cursor on the wing — swift, daring, and always probing for an opening.' },
     { id: 'ehren', name: 'Ehren ex Cursori', faction: 'Alera', difficulty: 'medium', blurb: 'A Cursor\'s careful, clever calculation. Misses little.' },
     { id: 'kitai', name: 'Kitai', faction: 'Alera', difficulty: 'medium', blurb: 'Marat-sharp and endlessly adaptable to your plans.' },
+    { id: 'bernard', name: 'Bernard', faction: 'Alera', difficulty: 'medium', blurb: 'A steadholder\'s patience — disciplined, defensive, every piece supporting the next.' },
+    { id: 'araris', name: 'Araris Valerian', faction: 'Alera', difficulty: 'medium', blurb: 'The peerless blade. Flawless defense, and he guards his lord above all.' },
+    { id: 'navaris', name: 'Phrygiar Navaris', faction: 'Alera', difficulty: 'hard', blurb: 'A relentless killer who hunts pieces without mercy or caution.' },
     { id: 'tavi', name: 'Tavi', faction: 'Alera', difficulty: 'hard', blurb: 'The finest Ludus mind in the Realm. He sees the endgame from the first move.' },
+    { id: 'attis', name: 'Aquitainus Attis', faction: 'Alera', difficulty: 'hard', blurb: 'High Lord Aquitaine — a bold, brilliant commander who seizes the skies and presses hard.' },
+    { id: 'invidia', name: 'Invidia Aquitaine', faction: 'Alera', difficulty: 'hard', blurb: 'Cold and patient. She sets traps and lets your own ambition undo you.' },
+    { id: 'gaius', name: 'Gaius Sextus', faction: 'Alera', difficulty: 'hard', blurb: 'The old First Lord — he wins by sacrifice and misdirection, and never stops hunting your king.' },
+    { id: 'doroga', name: 'Doroga', faction: 'Marat', difficulty: 'medium', blurb: 'A Marat headman\'s straightforward might — he comes straight at you, heedless of his own safety.' },
     { id: 'nasaug', name: 'Nasaug', faction: 'Canim', difficulty: 'medium', blurb: 'A Canim battlemaster who never wastes a move.' },
     { id: 'varg', name: 'Warmaster Varg', faction: 'Canim', difficulty: 'hard', blurb: 'Patient, disciplined, and utterly relentless once committed.' },
     { id: 'queen', name: 'The Vord Queen', faction: 'Vord', difficulty: 'hard', blurb: 'Cold, inhuman calculation. She studies you as you play.' }
   ];
-  var FACTIONS = ['Alera', 'Canim', 'Vord'];
+  var FACTIONS = ['Alera', 'Marat', 'Canim', 'Vord'];
   var DIFF_LABEL = { easy: 'Easy', medium: 'Medium', hard: 'Hard' };
 
   var ui, state, mode = null;            // 'bot' | 'hotseat' | 'online'

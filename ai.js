@@ -30,7 +30,24 @@
     // Patient, disciplined, relentless once committed — holds, controls the air, then strikes.
     varg:   { sky: 0.9, advance: 0.012, support: 0.09, danger: 55, ownDanger: 60, jitter: 0.02, furyBias: 0.05 },
     // Cold, inhuman calculation that studies you — deepest, aggressive everywhere, no nerves.
-    queen:  { sky: 1.0, advance: 0.025, support: 0.06, danger: 70, ownDanger: 55, jitter: 0.005, furyBias: 0.07 }
+    queen:  { sky: 1.0, advance: 0.025, support: 0.06, danger: 70, ownDanger: 55, jitter: 0.005, furyBias: 0.07 },
+    // Gaius Sextus — the old First Lord. Wins by sacrifice and misdirection; hunts
+    // your king relentlessly and will spend material to do it.
+    gaius:  { sky: 0.8,  advance: 0.022, support: 0.05, danger: 75, ownDanger: 40, jitter: 0.01, furyBias: 0.07 },
+    // Aquitainus Attis — bold, brilliant field commander. Seizes the skies, presses hard.
+    attis:  { sky: 0.95, advance: 0.035, support: 0.05, danger: 60, ownDanger: 45, jitter: 0.02, furyBias: 0.06 },
+    // Invidia Aquitaine — cold schemer. Patient, defensive, traps overreach; nerveless.
+    invidia:{ sky: 0.7,  advance: 0.008, support: 0.08, danger: 50, ownDanger: 70, jitter: 0.005, furyBias: 0.06 },
+    // Bernard — a steadholder's patience: disciplined, support-heavy, slow to advance.
+    bernard:{ sky: 0.45, advance: 0.008, support: 0.11, danger: 40, ownDanger: 60, jitter: 0.03, furyBias: 0.05 },
+    // Araris Valerian — the peerless blade. Flawless defense; guards his lord above all.
+    araris: { sky: 0.6,  advance: 0.012, support: 0.10, danger: 45, ownDanger: 70, jitter: 0.02, furyBias: 0.06 },
+    // Amara — a Cursor on the wing: swift, daring, ever probing, takes risks.
+    amara:  { sky: 0.75, advance: 0.04,  support: 0.04, danger: 50, ownDanger: 35, jitter: 0.10, furyBias: 0.05 },
+    // Phrygiar Navaris — a relentless killer. Hunts pieces and the king, careless of her own.
+    navaris:{ sky: 0.5,  advance: 0.045, support: 0.03, danger: 70, ownDanger: 20, jitter: 0.06, furyBias: 0.06 },
+    // Doroga — a Marat headman's straightforward might: charges, heedless of his own king.
+    doroga: { sky: 0.3,  advance: 0.05,  support: 0.03, danger: 55, ownDanger: 25, jitter: 0.12, furyBias: 0.03 }
   };
   var DEFAULT = { sky: 0.6, advance: 0.015, support: 0.05, danger: 40, ownDanger: 40, jitter: 0.01, furyBias: 0.03 };
 
