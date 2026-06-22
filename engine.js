@@ -14,7 +14,9 @@
 
   var GROUND = 11, SKY = 5, SKY_OFF = 3;
   // piece values for AI eval; FL is effectively infinite (king).
-  var VALUE = { L: 1, VL: 2, KF: 3, KT: 3, KI: 3, KA: 4, HL: 6, FL: 1000 };
+  // CU = Cursor (fast courier/scout), SH = Steadholder (defensive anchor). Per the
+  // Books 3-4 line, a Cursor + Steadholder together rival a First Lord's worth.
+  var VALUE = { L: 1, VL: 2, KF: 3, KT: 3, KI: 3, KA: 4, HL: 6, CU: 3, SH: 2, FL: 1000 };
   var AERIAL = { KA: 1, HL: 1, FL: 1 };
 
   function inGround(r, c) { return r >= 0 && r < GROUND && c >= 0 && c < GROUND; }
@@ -52,6 +54,9 @@
       add('L', 'white', GROUND - 2, c);
       add(back[c], 'white', GROUND - 1, c);
     }
+    // Cursor + Steadholder flank the First Lord's file, a rank behind the legionnaires.
+    add('CU', 'black', 2, 4); add('SH', 'black', 2, 6);
+    add('CU', 'white', GROUND - 3, 4); add('SH', 'white', GROUND - 3, 6);
     // captured[color] = pieces that `color` has taken (for the captured tray).
     return { pieces: pieces, turn: 'white', winner: null, moveCount: 0, captured: { white: [], black: [] } };
   }
@@ -169,6 +174,8 @@
         // range 2 (fire) that pierces the enemy directly behind the target (earth).
         rangedAttack(state, p, ORTHO, 2, out, true);
         break;
+      case 'CU': slide(state, p, ALL8, 4, out); break;        // fast courier: glides up to 4
+      case 'SH': slide(state, p, ALL8, 1, out); break;        // steadholder: holds its ground, steps 1
       case 'FL': slide(state, p, ALL8, 2, out); flyAndSkyMoves(state, p, out); break;
     }
   }
@@ -222,8 +229,13 @@
     return false;
   }
 
+  // Personality weights let each opponent bot "feel" like its character (see ai.js).
+  // material is always 1.0; the rest scale the positional/style terms.
+  var DEFAULT_W = { sky: 0.6, advance: 0.015, support: 0.05, danger: 40, ownDanger: 40 };
+
   // material eval from `color`'s perspective (+ tiny support bonus per canon).
-  function evaluate(state, color) {
+  function evaluate(state, color, w) {
+    w = w || DEFAULT_W;
     var score = 0;
     for (var i = 0; i < state.pieces.length; i++) {
       var p = state.pieces[i], v = VALUE[p.type] || 0;
@@ -232,27 +244,30 @@
     if (state.winner === color) score += 100000;
     else if (state.winner === opp(color)) score -= 100000;
     // support: friendly pieces orthogonally adjacent reinforce each other
-    score += supportBonus(state, color) - supportBonus(state, opp(color));
+    score += w.support * (supportCount(state, color) - supportCount(state, opp(color)));
     // positional: contest the skies + keep advancing (so bots don't just sit back)
-    score += positional(state, color) - positional(state, opp(color));
+    score += positional(state, color, w) - positional(state, opp(color), w);
     // king safety: a First Lord that can be captured next turn is in grave danger.
     // (v1 has no "check" legality, so the AI needs this to not hang/blunder its FL.)
-    if (firstLordAttacked(state, color)) score -= 40;
-    if (firstLordAttacked(state, opp(color))) score += 40;
+    // ownDanger = how much the bot fears for its own king (reckless foes lower it);
+    // danger = how keenly it hunts the enemy king.
+    if (firstLordAttacked(state, color)) score -= w.ownDanger;
+    if (firstLordAttacked(state, opp(color))) score += w.danger;
     return score;
   }
   // sky occupation + advance-toward-the-enemy nudge. Kept small vs material so the
   // AI won't sacrifice a knight for it, but enough to break passive/sky-blind play.
-  function positional(state, color) {
+  function positional(state, color, w) {
+    w = w || DEFAULT_W;
     var b = 0, fwd = forward(color);
     for (var i = 0; i < state.pieces.length; i++) {
       var p = state.pieces[i];
       if (p.color !== color) continue;
-      if (p.board === 'sky') { if (p.type !== 'FL') b += 0.6; continue; } // hold the skies
+      if (p.board === 'sky') { if (p.type !== 'FL') b += w.sky; continue; } // hold the skies
       if (p.type === 'FL') continue; // the king stays home; don't reward marching it
       // rows advanced from own back rank toward the foe (0..GROUND-1)
       var adv = (fwd < 0) ? (GROUND - 1 - p.r) : p.r;
-      b += adv * 0.015;
+      b += adv * w.advance;
     }
     return b;
   }
@@ -271,14 +286,15 @@
     }
     return false;
   }
-  function supportBonus(state, color) {
+  // count of friendly orthogonal reinforcements; a Steadholder anchors twice as hard.
+  function supportCount(state, color) {
     var b = 0;
     for (var i = 0; i < state.pieces.length; i++) {
       var p = state.pieces[i];
       if (p.color !== color || p.board !== 'ground') continue;
       for (var d = 0; d < ORTHO.length; d++) {
         var n = pieceAt(state, 'ground', p.r + ORTHO[d][0], p.c + ORTHO[d][1]);
-        if (n && n.color === color) b += 0.05;
+        if (n && n.color === color) b += (n.type === 'SH' ? 2 : 1);
       }
     }
     return b;

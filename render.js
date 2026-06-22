@@ -19,7 +19,7 @@
   var LIGHT = '#d9c4a3', DARK = '#9a7b4f', SKYL = '#3a5a7a', SKYD = '#26415c';
   var SEL = 'rgba(90,200,255,0.55)', DEST = 'rgba(120,255,160,0.45)', CAP = 'rgba(255,90,90,0.55)';
   var SHADOW = 'rgba(90,200,255,0.12)';
-  var GLYPH = { L: 'L', VL: 'V', KF: 'F', KT: 'T', KI: 'I', KA: 'A', HL: 'H', FL: '★' };
+  var GLYPH = { L: 'L', VL: 'V', KF: 'F', KT: 'T', KI: 'I', KA: 'A', HL: 'H', CU: 'C', SH: 'S', FL: '★' };
 
   function create(opts) {
     var canvas = opts.canvas, onAction = opts.onAction;

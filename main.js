@@ -160,7 +160,7 @@
     if (humanTurn) { setStatus(state.turn.toUpperCase() + ' to move.'); return; }
     setStatus((currentOpponent ? currentOpponent.name : state.turn.toUpperCase()) + ' is thinking…');
     setTimeout(function () {
-      var a = AI.chooseAction(state, state.turn, difficulty);
+      var a = AI.chooseAction(state, state.turn, difficulty, currentOpponent && currentOpponent.id);
       if (a) state = E.applyAction(state, a);
       loop();
     }, 140);

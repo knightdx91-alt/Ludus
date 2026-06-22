@@ -11,9 +11,10 @@ let pass = 0, fail = 0;
 function ok(name, cond) { cond ? (pass++, console.log('  ok  ' + name)) : (fail++, console.log('FAIL  ' + name)); }
 
 const s0 = E.initialState();
-ok('44 pieces total', s0.pieces.length === 44);
-ok('22 per side', s0.pieces.filter(p => p.color === 'white').length === 22);
+ok('48 pieces total', s0.pieces.length === 48);
+ok('24 per side', s0.pieces.filter(p => p.color === 'white').length === 24);
 ok('one FL each', s0.pieces.filter(p => p.type === 'FL').length === 2);
+ok('one Cursor + one Steadholder each', s0.pieces.filter(p => p.type === 'CU').length === 2 && s0.pieces.filter(p => p.type === 'SH').length === 2);
 ok('white moves first', s0.turn === 'white');
 
 const acts = E.legalActions(s0);

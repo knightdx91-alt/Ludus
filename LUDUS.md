@@ -36,7 +36,14 @@ broken skyboard mapping and underspecified rules.
 | Knight Ignis | KI | 2 | no | 3 |
 | Knight Aeris | KA | 2 | yes | 4 |
 | High Lord | HL | 2 | yes | 6 |
+| Cursor | CU | 2 | no | 3 |
+| Steadholder | SH | 2 | no | 2 |
 | First Lord | FL | 1 | yes | ∞ (king) |
+
+**Cursor (CU)** glides up to 4 squares any direction (captures by landing); a swift
+scout/courier (Books 3-4). **Steadholder (SH)** steps 1 any direction and doubles the
+support of friendly pieces beside it; per Gaius's line, a Cursor + Steadholder together
+rival a First Lord. Both sit on a third rank flanking the First Lord's file (24 pieces/side).
 
 ### Starting layout (both sides mirror)
 - Back rank: `KA KT KI KF HL FL HL KF KI KT KA` (11 across).
