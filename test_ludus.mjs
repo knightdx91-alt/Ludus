@@ -43,6 +43,23 @@ ok('underSky(0,0) false', E.underSky(0, 0) === false);
   ok('furycraft can still target a normal Knight', hitsKT === true);
 }
 
+// Steadholder ward: a piece beside a friendly Steadholder is immune to furycraft
+{
+  const base = (extra) => ({ pieces: [
+    { id: 'a', type: 'KI', color: 'white', board: 'ground', r: 5, c: 5, moved: true },
+    { id: 'b', type: 'L', color: 'black', board: 'ground', r: 5, c: 6, moved: true },
+    { id: 'wf', type: 'FL', color: 'white', board: 'ground', r: 10, c: 5, moved: true },
+    { id: 'bf', type: 'FL', color: 'black', board: 'ground', r: 0, c: 5, moved: true },
+    ...extra
+  ], turn: 'white', winner: null, moveCount: 0, captured: { white: [], black: [] } });
+  // no steadholder → the legionare 'b' can be struck
+  const open = E.legalActions(base([]), 'white');
+  ok('furycraft hits an unshielded piece', open.some(a => a.type === 'attack' && a.targets.includes('b')));
+  // black Steadholder beside 'b' → 'b' is warded
+  const shielded = E.legalActions(base([{ id: 's', type: 'SH', color: 'black', board: 'ground', r: 5, c: 7, moved: true }]), 'white');
+  ok('furycraft cannot hit a Steadholder-shielded piece', !shielded.some(a => a.type === 'attack' && a.targets.includes('b')));
+}
+
 // determinism of applyAction (no mutation of input)
 const before = JSON.stringify(s0);
 E.applyAction(s0, acts[0]);

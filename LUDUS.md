@@ -42,10 +42,14 @@ broken skyboard mapping and underspecified rules.
 | First Lord | FL | 1 | yes | ∞ (king) |
 
 **Cursor (CU)** glides up to 4 squares any direction (captures by landing); a swift
-scout/courier (Books 3-4). **Steadholder (SH)** steps 1 any direction and doubles the
-support of friendly pieces beside it; per Gaius's line, a Cursor + Steadholder together
-rival a First Lord. They share a third rank — flanked by the two **Knights Ferrous (KR)** —
-just behind the legionares (26 pieces/side).
+scout/courier (Books 3-4). **Steadholder (SH)** steps 1 any direction and **shelters**: any
+friendly piece orthogonally adjacent to it is immune to enemy furycraft strikes (and a warded
+piece also stops the strike's line, shielding what's behind it — see `furyWarded`). Per
+Gaius's line, a Cursor + Steadholder together rival a First Lord: the Cursor has no furycraft
+of its own and is fragile, but sheltered beside a Steadholder it becomes fury-proof while
+keeping its 4-square reach, so the pair is a resilient, far-striking unit. They share a third
+rank — flanked by the two **Knights Ferrous (KR)** — just behind the legionares (26 pieces/side).
+(The AI also still gets a small `support` eval bonus for clustering, doubled next to a Steadholder.)
 
 ### Starting layout (both sides mirror)
 - Back rank: `KA KT KI KF HL FL HL KF KI KT KA` (11 across).

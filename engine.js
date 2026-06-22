@@ -102,6 +102,19 @@
     }
   }
 
+  // A piece that furycraft can't touch: a Knight Ferrous (metalcraft ward), or any
+  // piece sheltered beside a friendly Steadholder. A warded piece also stops the
+  // strike's line (the fury breaks against the ward) — so it shields what's behind it.
+  function furyWarded(state, q) {
+    if (q.type === 'KR') return true;                 // metalcraft: the armor itself
+    if (q.board !== 'ground') return false;
+    for (var d = 0; d < ORTHO.length; d++) {
+      var n = pieceAt(state, 'ground', q.r + ORTHO[d][0], q.c + ORTHO[d][1]);
+      if (n && n.color === q.color && n.type === 'SH') return true; // sheltered by a Steadholder
+    }
+    return false;
+  }
+
   function rangedAttack(state, p, dirs, maxRange, out, pierce) {
     // furycraft: hit first enemy along each dir within range (LOS blocked by anyone).
     for (var d = 0; d < dirs.length; d++) {
@@ -112,11 +125,11 @@
         var occ = pieceAt(state, 'ground', r, c);
         if (!occ) continue;
         if (occ.color === p.color) break; // own piece blocks
-        if (occ.type === 'KR') break;     // metalcraft ward: a Ferrous can't be struck by furycraft (and stops the strike)
+        if (furyWarded(state, occ)) break; // Ferrous, or shielded by a Steadholder — can't be struck, and stops the strike
         var targets = [occ.id];
         if (pierce) {
           var br = r + dr, bc = c + dc, behind = inGround(br, bc) ? pieceAt(state, 'ground', br, bc) : null;
-          if (behind && behind.color !== p.color && behind.type !== 'KR') targets.push(behind.id);
+          if (behind && behind.color !== p.color && !furyWarded(state, behind)) targets.push(behind.id);
         }
         out.push({ pieceId: p.id, type: 'attack', to: { board: 'ground', r: p.r, c: p.c }, targets: targets });
         break; // first enemy hit
