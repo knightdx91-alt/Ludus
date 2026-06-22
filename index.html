@@ -58,14 +58,27 @@
   /* game screen */
   #screenGame { max-width:none; }
   .game-top { display:flex; align-items:center; justify-content:space-between; gap:10px;
-    max-width:820px; margin:0 auto 12px; flex-wrap:wrap; }
+    max-width:600px; margin:0 auto 12px; flex-wrap:wrap; }
   .game-top .opp { font-size:14px; }
   .game-top .opp b { color:var(--warm); }
   .game-top .tools { display:flex; gap:8px; }
-  .boardwrap { max-width:820px; margin:0 auto; }
+  .boardwrap { max-width:600px; margin:0 auto; }
   canvas#board { width:100%; height:auto; display:block;
     border:1px solid #2a3848; border-radius:8px; background:#11161d; }
   #status { font-size:14px; color:var(--warm); min-height:20px; margin-top:10px; text-align:center; }
+  /* floating options cog (bottom-right) + its popup menu */
+  .cog { position:fixed; right:20px; bottom:20px; width:52px; height:52px; padding:0;
+    border-radius:50%; font-size:22px; line-height:52px; text-align:center; z-index:60;
+    background:#1b2530; border:1px solid #34506b; color:#cfe3ff; cursor:pointer;
+    box-shadow:0 4px 14px rgba(0,0,0,.5); transition:transform .15s, background .15s; }
+  .cog:hover { background:#243446; }
+  .cog.open { transform:rotate(60deg); background:#243446; }
+  .optmenu { position:fixed; right:20px; bottom:82px; z-index:60; display:none;
+    flex-direction:column; gap:8px; min-width:178px; padding:12px;
+    background:#11161c; border:1px solid #2b3a44; border-radius:10px;
+    box-shadow:0 6px 22px rgba(0,0,0,.55); }
+  .optmenu.open { display:flex; }
+  .optmenu button { width:100%; text-align:center; }
 
   #roomBox { display:none; background:#0e141b; border:1px solid #2a3848; border-radius:8px;
     padding:12px; font-size:14px; margin-top:12px; }
@@ -229,10 +242,6 @@
     <div class="tools">
       <span id="gameClock" title="Time elapsed this game" style="font:13px/1 monospace;color:#9fd0ff;align-self:center;margin-right:4px">⏱ 0:00</span>
       <button id="btnWatch" class="ghost" style="display:none" title="Let others watch this game">📡 Let others watch</button>
-      <button id="btnSettings" class="ghost" title="Settings">⚙ Settings</button>
-      <button id="btnHints" class="ghost" data-on="1" title="Show legal moves for the selected piece">◎ Moves: On</button>
-      <button id="btnFlip" class="ghost" data-p="white" title="Flip board">⟳ Flip</button>
-      <button id="btnNewGame">New Game</button>
     </div>
   </div>
   <!-- Shown to the player still at the board when their opponent backs out:
@@ -243,6 +252,16 @@
   <div class="boardwrap">
     <canvas id="board"></canvas>
     <div id="status">Loading…</div>
+  </div>
+
+  <!-- Options: a floating cog in the bottom-right opens the less-used controls
+       so the game header stays uncluttered. -->
+  <button id="btnOptions" class="cog" title="Options" aria-label="Options">⚙</button>
+  <div id="optionsMenu" class="optmenu">
+    <button id="btnNewGame">New Game</button>
+    <button id="btnFlip" class="ghost" data-p="white" title="Flip board">⟳ Flip board</button>
+    <button id="btnHints" class="ghost" data-on="1" title="Show legal moves for the selected piece">◎ Moves: On</button>
+    <button id="btnSettings" class="ghost" title="Settings">⚙ Settings</button>
   </div>
 </section>
 

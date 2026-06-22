@@ -11,10 +11,13 @@
   var GW = E.GROUND * GCELL;      // ground pixel width/height
   var SW = E.SKY * SCELL;         // sky pixel width/height
   var PAD = 16;
-  var W = PAD + GW + GAP + SW + PAD;
-  var H = PAD + GW + PAD;
-  var SKY_X = PAD + GW + GAP, SKY_Y = PAD;  // sky board origin
+  // Layout: the ground board fills the top; the sky board sits BELOW it on the
+  // left, with the captured-piece tray filling the space to its right.
   var GRD_X = PAD, GRD_Y = PAD;
+  var SKY_X = PAD, SKY_Y = PAD + GW + GAP;
+  var CAP_X = SKY_X + SW + GAP;            // captured tray, right of the sky board
+  var W = PAD + GW + PAD;
+  var H = SKY_Y + SW + PAD;
 
   var LIGHT = '#d9c4a3', DARK = '#9a7b4f', SKYL = '#3a5a7a', SKYD = '#26415c';
   var SEL = 'rgba(90,200,255,0.55)', DEST = 'rgba(120,255,160,0.45)', CAP = 'rgba(255,90,90,0.55)';
@@ -96,11 +99,12 @@
       drawCaptured();
     }
 
-    // Captured-pieces tray in the empty space below the sky board. Each row shows
-    // the foes one side has taken (and which piece took the last one).
+    // Captured-pieces tray in the space to the right of the sky board. Each row
+    // shows the foes one side has taken (and which piece took the last one).
     function drawCaptured() {
       if (!state.captured) return;
-      var x0 = SKY_X, y0 = SKY_Y + SW + 22, rowH = 78, r = 9, gap = 4;
+      var x0 = CAP_X, y0 = SKY_Y + 14, rowH = 90, r = 9, gap = 4;
+      var trayW = W - PAD - CAP_X;            // available width for chips
       // perspective: show "your" captures (bottom side) first.
       var bottom = perspective === 'black' ? 'black' : 'white';
       var top = bottom === 'white' ? 'black' : 'white';
@@ -114,7 +118,7 @@
         var y = y0 + ri * rowH;
         ctx.fillStyle = '#9fb4cc'; ctx.font = '11px monospace';
         ctx.fillText(rows[ri].label + ' (' + list.length + ')', x0, y - 12);
-        var x = x0, perRow = Math.floor(SW / (r * 2 + gap));
+        var perRow = Math.max(1, Math.floor(trayW / (r * 2 + gap)));
         for (var i = 0; i < list.length; i++) {
           var col = i % perRow, line = Math.floor(i / perRow);
           var cx = x0 + r + col * (r * 2 + gap), cy = y + r + line * (r * 2 + gap);

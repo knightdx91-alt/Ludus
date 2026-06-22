@@ -29,9 +29,10 @@ node test_ludus.mjs  # game engine + AI
 - `net.js` — Firebase Realtime DB rooms, lobby index, presence, plus the Hall of
   Records: `results/` (leaderboard: who beat whom + durationMs) and `messages/`
   (public board), and a localStorage player handle (`window.LudusNet`).
-- `render.js` — canvas board + input (`window.LudusUI`). Captured-piece tray
-  under the sky board; a move-capture vs furycraft-strike chooser popup; a
-  show-legal-moves toggle (`setShowMoves`).
+- `render.js` — canvas board + input (`window.LudusUI`). Portrait layout: the
+  ground board fills the top, the sky board sits below it on the left, and the
+  captured-piece tray fills the space to the sky board's right. A move-capture vs
+  furycraft-strike chooser popup; a show-legal-moves toggle (`setShowMoves`).
 - `main.js` — screen flow + game controller. Collapsible faction groups on the
   title; in-game elapsed clock; Hall overlay; one-time name prompt at first game.
 - `index.html` — single-page shell; `firebase-config.js` holds the DB config.

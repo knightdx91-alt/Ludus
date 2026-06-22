@@ -569,6 +569,20 @@
       ui.setShowMoves(on);
     };
 
+    // floating options cog: toggles the menu of less-used controls; closes after
+    // a choice or an outside click.
+    var optMenu = $('optionsMenu'), optCog = $('btnOptions');
+    function closeOptions() { optMenu.classList.remove('open'); optCog.classList.remove('open'); }
+    optCog.onclick = function (e) {
+      e.stopPropagation();
+      var open = !optMenu.classList.contains('open');
+      optMenu.classList.toggle('open', open); optCog.classList.toggle('open', open);
+    };
+    optMenu.addEventListener('click', function (e) { if (e.target.closest('button')) closeOptions(); });
+    document.addEventListener('click', function (e) {
+      if (optMenu.classList.contains('open') && !optMenu.contains(e.target) && e.target !== optCog) closeOptions();
+    });
+
     // settings modal
     $('btnSettings').onclick = openSettings;
     $('btnSettingsClose').onclick = closeSettings;
