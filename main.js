@@ -369,6 +369,12 @@
       var next = $('btnFlip').dataset.p === 'black' ? 'white' : 'black';
       $('btnFlip').dataset.p = next; ui.setPerspective(next);
     };
+    $('btnHints').onclick = function () {
+      var on = $('btnHints').dataset.on !== '1';
+      $('btnHints').dataset.on = on ? '1' : '0';
+      $('btnHints').textContent = '◎ Moves: ' + (on ? 'On' : 'Off');
+      ui.setShowMoves(on);
+    };
 
     // settings modal
     $('btnSettings').onclick = openSettings;

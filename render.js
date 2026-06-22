@@ -26,6 +26,7 @@
     canvas.width = W; canvas.height = H;
     var ctx = canvas.getContext('2d');
     var state = null, selected = null, actions = [], interactive = true, perspective = 'white';
+    var showMoves = true;   // highlight a selected piece's legal destinations
 
     // map a board cell to its top-left pixel, honoring perspective flip
     function cellPx(board, r, c) {
@@ -77,7 +78,7 @@
       if (selected) {
         var selPx = cellPx(selected.board, selected.r, selected.c);
         outline(selPx, SEL);
-        for (var i = 0; i < actions.length; i++) {
+        if (showMoves) for (var i = 0; i < actions.length; i++) {
           var a = actions[i]; if (a.pieceId !== selected.id) continue;
           var d = cellPx(a.to.board, a.to.r, a.to.c);
           if (a.type === 'attack') { // ranged: mark each target cell
@@ -91,6 +92,45 @@
         var pc = state.pieces[k], q = cellPx(pc.board, pc.r, pc.c);
         drawPiece(q, pc);
       }
+
+      drawCaptured();
+    }
+
+    // Captured-pieces tray in the empty space below the sky board. Each row shows
+    // the foes one side has taken (and which piece took the last one).
+    function drawCaptured() {
+      if (!state.captured) return;
+      var x0 = SKY_X, y0 = SKY_Y + SW + 22, rowH = 78, r = 9, gap = 4;
+      // perspective: show "your" captures (bottom side) first.
+      var bottom = perspective === 'black' ? 'black' : 'white';
+      var top = bottom === 'white' ? 'black' : 'white';
+      var rows = [
+        { who: bottom, label: 'Your captures' },
+        { who: top, label: 'Foe’s captures' }
+      ];
+      ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      for (var ri = 0; ri < rows.length; ri++) {
+        var list = state.captured[rows[ri].who] || [];
+        var y = y0 + ri * rowH;
+        ctx.fillStyle = '#9fb4cc'; ctx.font = '11px monospace';
+        ctx.fillText(rows[ri].label + ' (' + list.length + ')', x0, y - 12);
+        var x = x0, perRow = Math.floor(SW / (r * 2 + gap));
+        for (var i = 0; i < list.length; i++) {
+          var col = i % perRow, line = Math.floor(i / perRow);
+          var cx = x0 + r + col * (r * 2 + gap), cy = y + r + line * (r * 2 + gap);
+          drawChip(cx, cy, r, list[i]);
+        }
+      }
+    }
+    function drawChip(cx, cy, r, victim) {
+      ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.fillStyle = victim.color === 'white' ? '#f2ead2' : '#2a2a32';
+      ctx.fill();
+      ctx.lineWidth = 1.5; ctx.strokeStyle = victim.color === 'white' ? '#8a7a52' : '#0c0c10'; ctx.stroke();
+      ctx.fillStyle = victim.color === 'white' ? '#2a2a32' : '#f2ead2';
+      ctx.font = 'bold ' + (r * 1.1) + 'px monospace'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(GLYPH[victim.type] || '?', cx, cy + 1);
+      ctx.textAlign = 'left';
     }
 
     function outline(p, color) { ctx.fillStyle = color; ctx.fillRect(p.x, p.y, p.s, p.s); }
@@ -113,25 +153,55 @@
       var rect = canvas.getBoundingClientRect();
       var px = (ev.clientX - rect.left) * (W / rect.width);
       var py = (ev.clientY - rect.top) * (H / rect.height);
+      closeChooser();
       var cell = pxCell(px, py); if (!cell) return;
       // if a selected piece can act on this cell, commit
       if (selected) {
+        var moveAct = null, atkAct = null;
         for (var i = 0; i < actions.length; i++) {
           var a = actions[i]; if (a.pieceId !== selected.id) continue;
           if (a.type === 'attack') {
             for (var t = 0; t < a.targets.length; t++) {
               var v = E.pieceById(state, a.targets[t]);
-              if (v && v.board === cell.board && v.r === cell.r && v.c === cell.c) { commit(a); return; }
+              if (v && v.board === cell.board && v.r === cell.r && v.c === cell.c) { atkAct = a; break; }
             }
-          } else if (a.to.board === cell.board && a.to.r === cell.r && a.to.c === cell.c) { commit(a); return; }
+          } else if (a.to.board === cell.board && a.to.r === cell.r && a.to.c === cell.c) { moveAct = a; }
         }
+        // Both a move-capture and a furycraft strike land on this square → let the
+        // player choose instead of silently picking one (Knight Flora/Ignis etc.).
+        if (moveAct && atkAct) { showChooser(ev.clientX, ev.clientY, moveAct, atkAct); return; }
+        if (moveAct) { commit(moveAct); return; }
+        if (atkAct) { commit(atkAct); return; }
       }
       // else (re)select a friendly piece we're allowed to move
       var p = E.pieceAt(state, cell.board, cell.r, cell.c);
       if (p && p.color === state.turn && opts.canSelect(p.color)) { selected = p; draw(); }
       else { selected = null; draw(); }
     }
-    function commit(a) { selected = null; onAction(a); }
+    function commit(a) { closeChooser(); selected = null; onAction(a); }
+
+    // small popup to disambiguate move-capture vs furycraft strike on one square
+    var chooserEl = null;
+    function closeChooser() { if (chooserEl) { chooserEl.parentNode && chooserEl.parentNode.removeChild(chooserEl); chooserEl = null; } }
+    function showChooser(clientX, clientY, moveAct, atkAct) {
+      closeChooser();
+      var m = document.createElement('div');
+      m.style.cssText = 'position:fixed;z-index:9999;left:' + clientX + 'px;top:' + clientY +
+        'px;background:#1b2530;border:1px solid #3a5a7a;border-radius:8px;padding:6px;' +
+        'display:flex;flex-direction:column;gap:4px;box-shadow:0 6px 20px rgba(0,0,0,.55)';
+      function btn(label, act) {
+        var b = document.createElement('button');
+        b.textContent = label;
+        b.style.cssText = 'cursor:pointer;border:0;border-radius:6px;padding:7px 12px;' +
+          'font:13px/1.2 monospace;background:#274058;color:#eaf2ff;white-space:nowrap';
+        b.onclick = function (e) { e.stopPropagation(); commit(act); };
+        return b;
+      }
+      m.appendChild(btn('⚔ Move & capture', moveAct));
+      m.appendChild(btn('✷ Furycraft strike', atkAct));
+      document.body.appendChild(m);
+      chooserEl = m;
+    }
 
     canvas.addEventListener('click', onClick);
 
@@ -139,7 +209,8 @@
       render: function (st) { state = st; actions = st && !st.winner ? E.legalActions(st, st.turn) : []; if (selected && !E.pieceById(st, selected.id)) selected = null; draw(); },
       setInteractive: function (b) { interactive = b; },
       setPerspective: function (p) { perspective = p; if (state) draw(); },
-      clearSelection: function () { selected = null; if (state) draw(); }
+      setShowMoves: function (b) { showMoves = !!b; if (state) draw(); },
+      clearSelection: function () { closeChooser(); selected = null; if (state) draw(); }
     };
   }
 

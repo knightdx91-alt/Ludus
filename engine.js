@@ -52,7 +52,8 @@
       add('L', 'white', GROUND - 2, c);
       add(back[c], 'white', GROUND - 1, c);
     }
-    return { pieces: pieces, turn: 'white', winner: null, moveCount: 0 };
+    // captured[color] = pieces that `color` has taken (for the captured tray).
+    return { pieces: pieces, turn: 'white', winner: null, moveCount: 0, captured: { white: [], black: [] } };
   }
 
   // ---- per-piece action generation -------------------------------------
@@ -188,10 +189,16 @@
     var p = pieceById(ns, action.pieceId);
     if (!p) return ns;
     var capturedFL = false;
+    if (!ns.captured) ns.captured = { white: [], black: [] };
     if (action.targets && action.targets.length) {
       for (var t = 0; t < action.targets.length; t++) {
         var victim = pieceById(ns, action.targets[t]);
-        if (victim) { if (victim.type === 'FL') capturedFL = true; remove(ns, victim.id); }
+        if (victim) {
+          if (victim.type === 'FL') capturedFL = true;
+          // record what `p` (the actor) took, and with which piece, for the tray.
+          ns.captured[p.color].push({ type: victim.type, color: victim.color, by: p.type });
+          remove(ns, victim.id);
+        }
       }
     }
     if (action.type !== 'attack') {
@@ -226,7 +233,43 @@
     else if (state.winner === opp(color)) score -= 100000;
     // support: friendly pieces orthogonally adjacent reinforce each other
     score += supportBonus(state, color) - supportBonus(state, opp(color));
+    // positional: contest the skies + keep advancing (so bots don't just sit back)
+    score += positional(state, color) - positional(state, opp(color));
+    // king safety: a First Lord that can be captured next turn is in grave danger.
+    // (v1 has no "check" legality, so the AI needs this to not hang/blunder its FL.)
+    if (firstLordAttacked(state, color)) score -= 40;
+    if (firstLordAttacked(state, opp(color))) score += 40;
     return score;
+  }
+  // sky occupation + advance-toward-the-enemy nudge. Kept small vs material so the
+  // AI won't sacrifice a knight for it, but enough to break passive/sky-blind play.
+  function positional(state, color) {
+    var b = 0, fwd = forward(color);
+    for (var i = 0; i < state.pieces.length; i++) {
+      var p = state.pieces[i];
+      if (p.color !== color) continue;
+      if (p.board === 'sky') { if (p.type !== 'FL') b += 0.6; continue; } // hold the skies
+      if (p.type === 'FL') continue; // the king stays home; don't reward marching it
+      // rows advanced from own back rank toward the foe (0..GROUND-1)
+      var adv = (fwd < 0) ? (GROUND - 1 - p.r) : p.r;
+      b += adv * 0.015;
+    }
+    return b;
+  }
+  // does `color`'s First Lord sit on a square an enemy action can hit?
+  function firstLordAttacked(state, color) {
+    var fl = null;
+    for (var i = 0; i < state.pieces.length; i++) {
+      var q = state.pieces[i];
+      if (q.color === color && q.type === 'FL') { fl = q; break; }
+    }
+    if (!fl) return false;
+    var enemy = legalActions(state, opp(color));
+    for (var a = 0; a < enemy.length; a++) {
+      var ts = enemy[a].targets;
+      for (var t = 0; t < ts.length; t++) if (ts[t] === fl.id) return true;
+    }
+    return false;
   }
   function supportBonus(state, color) {
     var b = 0;
