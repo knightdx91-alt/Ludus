@@ -150,6 +150,7 @@
 
   // ---- start a local (bot/hotseat) game --------------------------------
   function startBot(side) {
+    if (side === 'random') side = Math.random() < 0.5 ? 'white' : 'black';
     currentSide = side;
     aiColor = side === 'white' ? 'black' : 'white';
     var hc = {}; hc[side] = true;

@@ -81,7 +81,9 @@
   function odRemove(path) { var od = odOf(path); if (od && od.remove) od.remove(); }
   function odCancel(path) { var od = odOf(path); if (od && od.cancel) od.cancel(); }
 
-  // Create a room as `white`. Returns {roomId, color, ref}.
+  // Create a room. Returns {roomId, color, ref} — the host's color is random by
+  // default (override with opts.color = 'white'|'black'); the joiner takes the
+  // free seat.
   // opts.public !== false → the room is advertised in the open-games lobby
   // via a lightweight lobby/{id} index entry (no game state — that stays under
   // rooms/{id}, which the rules only allow reading one room at a time).
@@ -89,9 +91,16 @@
     opts = opts || {};
     return init().then(function () {
       var id = randomRoomId(), ref = db.ref('rooms/' + id), pub = opts.public !== false;
+      // The host's color is random by default (so it isn't always white). A
+      // caller can force it with opts.color; the other seat is left open for the
+      // joiner (joinRoom fills whichever seat is free).
+      var hostColor = opts.color === 'white' || opts.color === 'black'
+        ? opts.color : (Math.random() < 0.5 ? 'white' : 'black');
+      var seats = { white: null, black: null };
+      seats[hostColor] = clientId();
       return ref.set({
         state: initialState,
-        players: { white: clientId(), black: null },
+        players: seats,
         public: pub,
         created: Date.now(),
         updated: Date.now()
@@ -106,7 +115,7 @@
         // once an opponent joins) swaps this for seat-only cleanup.
         odRemove('rooms/' + id);
         if (pub) odRemove('lobby/' + id);
-        return { roomId: id, color: 'white', ref: ref };
+        return { roomId: id, color: hostColor, ref: ref };
       });
     });
   }

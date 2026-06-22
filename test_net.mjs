@@ -141,11 +141,23 @@ ok('configured() true with mock config', A.configured() === true);
 ok('A and B have distinct client ids', A.clientId() !== B.clientId());
 
 (async function () {
-  // --- host creates a room ---
-  const room = await A.createRoom({ demo: 'initial-state' });
+  // --- host creates a room (force white so the rest of the flow is deterministic) ---
+  const room = await A.createRoom({ demo: 'initial-state' }, { color: 'white' });
   ok('createRoom returns a 5-char code', typeof room.roomId === 'string' && room.roomId.length === 5);
-  ok('host is white', room.color === 'white');
+  ok('host honors forced color', room.color === 'white');
   ok('seat keyed on the anonymous-auth uid', store._root.rooms[room.roomId].players.white === A.clientId() && /^uid_/.test(A.clientId()));
+
+  // --- color is random by default: host lands in exactly one seat, the other stays open ---
+  let sawWhite = false, sawBlack = false;
+  for (let i = 0; i < 30; i++) {
+    const rr = await A.createRoom({ demo: 'rng' });
+    const seats = store._root.rooms[rr.roomId].players;
+    const okSeat = seats[rr.color] === A.clientId() && seats[rr.color === 'white' ? 'black' : 'white'] === null;
+    if (!okSeat) { sawWhite = sawBlack = false; break; }
+    if (rr.color === 'white') sawWhite = true; else sawBlack = true;
+    await A.leaveRoom(rr.ref);
+  }
+  ok('default color is randomized across both seats', sawWhite && sawBlack);
 
   // --- host watches seats; should NOT be full yet ---
   let hostSawFull = false, lastPlayers = null;
@@ -260,7 +272,7 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
 
   // --- a live game survives one player's disconnect: only that seat vacates,
   //     and the match is NOT destroyed ---
-  const live = await A.createRoom({ demo: 'live' });
+  const live = await A.createRoom({ demo: 'live' }, { color: 'white' });
   const liveB = await B.joinRoom(live.roomId);
   A.armGame(live.ref, 'white');   // both clients arm seat-only cleanup on entry
   B.armGame(liveB.ref, 'black');
