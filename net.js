@@ -184,7 +184,13 @@
     return init().then(function () {
       var ref = db.ref('presence/' + clientId());
       db.ref('.info/connected').on('value', function (snap) {
-        if (snap.val() === true) { ref.onDisconnect().remove(); ref.set(Date.now()); }
+        if (snap.val() === true) {
+          ref.onDisconnect().remove();
+          // Store the player's chosen handle alongside the timestamp so the
+          // header can list *who* is online, not just how many. numChildren()
+          // still works for the count since each client is one child node.
+          ref.set({ name: playerName() || '', at: Date.now() });
+        }
       });
     }).catch(function () {});
   }
@@ -225,6 +231,26 @@
     init().then(function () {
       ref = db.ref('presence');
       ref.on('value', function (snap) { cb(snap.numChildren()); });
+    }).catch(function () {});
+    return function () { if (ref) try { ref.off('value'); } catch (e) {} };
+  }
+
+  // Subscribe to the list of online clients. cb(list) where each entry is
+  // {id, name, at}. Older clients (or any that wrote just a timestamp) come
+  // through with a blank name. Returns unsubscribe fn.
+  function onOnline(cb) {
+    var ref = null;
+    init().then(function () {
+      ref = db.ref('presence');
+      ref.on('value', function (snap) {
+        var out = [];
+        snap.forEach(function (c) {
+          var v = c.val();
+          if (v && typeof v === 'object') out.push({ id: c.key, name: v.name || '', at: v.at || 0 });
+          else out.push({ id: c.key, name: '', at: typeof v === 'number' ? v : 0 });
+        });
+        cb(out);
+      });
     }).catch(function () {});
     return function () { if (ref) try { ref.off('value'); } catch (e) {} };
   }
@@ -381,7 +407,7 @@
     onState: onState, pushState: pushState,
     onPlayers: onPlayers, isFull: isFull, leaveRoom: leaveRoom, armGame: armGame,
     setAway: setAway, clearAway: clearAway, onAway: onAway,
-    startPresence: startPresence, onOnlineCount: onOnlineCount, onRooms: onRooms,
+    startPresence: startPresence, onOnlineCount: onOnlineCount, onOnline: onOnline, onRooms: onRooms,
     sweepStale: sweepStale
   };
 })();

@@ -103,8 +103,9 @@ The DB has three top-level nodes:
 - `lobby/{id}` — `{ open, full, host, updated }`. A lightweight, publicly-listable index
   of `public` rooms (no game state) that powers the **Open Games** lobby: Join an open
   seat, or **Watch** a full game as a spectator. Kept in sync by create/join/leave.
-- `presence/{clientId}` — written while a client is connected (via `.info/connected` +
-  `onDisconnect().remove()`); the header **online count** is just this node's child count.
+- `presence/{clientId}` — `{name, at}` written while a client is connected (via
+  `.info/connected` + `onDisconnect().remove()`); the header **online count** is this
+  node's child count, and clicking it expands a roster of the connected players' names.
 
 Why the split: spectating and joining need a single room readable, but the lobby needs a
 *list*. Exposing all of `rooms` would leak every game's full state, so the listable part

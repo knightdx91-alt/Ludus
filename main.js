@@ -566,6 +566,36 @@
         var el = $('onlineCount');
         if (el) { el.textContent = '● ' + n + ' online'; el.style.display = ''; }
       });
+
+      // Click the count to expand a roster of who's online (names people picked
+      // for the leaderboard; unnamed clients show as "Anonymous").
+      var online = [];
+      var renderRoster = function () {
+        var list = $('onlineList');
+        if (!list) return;
+        if (!online.length) { list.innerHTML = '<div style="padding:4px 14px;color:#7d8a93">No one online</div>'; return; }
+        var me = NET.clientId();
+        list.innerHTML = online.map(function (p) {
+          var name = (p.name || '').trim() || 'Anonymous';
+          name = name.replace(/[<>&]/g, '');                 // basic escaping
+          var mine = p.id === me ? ' <span style="color:#7d8a93">(you)</span>' : '';
+          return '<div style="padding:4px 14px;white-space:nowrap">● ' + name + mine + '</div>';
+        }).join('');
+      };
+      NET.onOnline(function (list) {
+        online = list.slice().sort(function (a, b) { return (a.name || '~').localeCompare(b.name || '~'); });
+        if ($('onlineList').style.display !== 'none') renderRoster();
+      });
+      $('onlineCount').onclick = function () {
+        var list = $('onlineList');
+        if (list.style.display === 'none') { renderRoster(); list.style.display = ''; }
+        else list.style.display = 'none';
+      };
+      // Close the roster when clicking elsewhere.
+      document.addEventListener('click', function (e) {
+        var list = $('onlineList'), badge = $('onlineCount');
+        if (list && list.style.display !== 'none' && e.target !== badge && !list.contains(e.target)) list.style.display = 'none';
+      });
     }
 
     showScreen('screenTitle');
