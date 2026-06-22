@@ -25,6 +25,8 @@
   var currentOpponent = null, currentSide = 'white';
   var net = null, unsub = null, unsubPlayers = null, applying = false, unsubRooms = null;
   var unsubAway = null, awayTimer = null, awayUntil = 0;
+  var gameStart = 0, gameRecorded = false;          // for the Hall of Records
+  var unsubLeader = null, unsubMsg = null;
 
   function $(id) { return document.getElementById(id); }
   function setStatus(m) { $('status').textContent = m; }
@@ -140,14 +142,30 @@
     $('btnFlip').dataset.p = perspective;
     ui.setPerspective(perspective);
     ui.clearSelection();
+    gameStart = Date.now(); gameRecorded = false;
     showScreen('screenGame');
     loop();
+  }
+
+  // Record a human victory to the shared leaderboard (bot + online games only).
+  function recordResult() {
+    if (gameRecorded) return;
+    gameRecorded = true;
+    if (mode !== 'bot' && mode !== 'online') return;   // skip hotseat / spectate
+    if (!NET.configured() || !(state && state.winner)) return;
+    if (!humanColors[state.winner]) return;            // a Hall of *Records* = victories
+    var foe = mode === 'bot' ? (currentOpponent ? currentOpponent.name : 'the bot') : 'an online challenger';
+    NET.submitResult({
+      name: NET.playerName() || 'Challenger', opponent: foe,
+      mode: mode, won: true, durationMs: Date.now() - gameStart
+    });
   }
 
   function loop() {
     ui.render(state);
     if (state.winner) {
       var youWin = humanColors[state.winner];
+      recordResult();
       if (mode === 'spectate') setStatus(state.winner.toUpperCase() + ' wins — captured the First Lord.');
       else setStatus((mode === 'hotseat' ? state.winner.toUpperCase() + ' wins' : (youWin ? 'Victory — you' : 'Defeat — your foe') + ' captured the First Lord') + '.');
       ui.setInteractive(false);
@@ -305,6 +323,7 @@
   function enterOnlineGame(room) {
     net = room; mode = 'online';
     NET.armGame(room.ref, room.color); // a tab that dies mid-game drops only its own seat
+    gameStart = Date.now(); gameRecorded = false;
     $('oppLabel').textContent = 'Online · you are ' + room.color;
     ui.setPerspective(room.color); $('btnFlip').dataset.p = room.color;
     $('roomBox').style.display = 'block';
@@ -331,6 +350,58 @@
     $('settingsOverlay').classList.add('open');
   }
   function closeSettings() { $('settingsOverlay').classList.remove('open'); }
+
+  // ---- Hall of Records: leaderboard + message board --------------------
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+  function fmtTime(ms) {
+    var s = Math.max(0, Math.round((ms || 0) / 1000)), m = (s / 60) | 0;
+    return m + ':' + ('0' + (s % 60)).slice(-2);
+  }
+  function openBoards() {
+    $('boardsName').value = NET.playerName();
+    var note = $('boardsNote');
+    if (!NET.configured()) {
+      note.textContent = 'Online play isn’t configured (ludus/firebase-config.js), so the Hall is offline — names still save locally.';
+      note.style.display = 'block';
+    } else { note.style.display = 'none'; }
+    $('boardsOverlay').classList.add('open');
+    if (NET.configured()) {
+      if (!unsubLeader) unsubLeader = NET.onResults(renderLeader);
+      if (!unsubMsg) unsubMsg = NET.onMessages(renderMsgs);
+    }
+  }
+  function closeBoards() {
+    $('boardsOverlay').classList.remove('open');
+    if (unsubLeader) { unsubLeader(); unsubLeader = null; }
+    if (unsubMsg) { unsubMsg(); unsubMsg = null; }
+  }
+  function renderLeader(list) {
+    var host = $('leaderList');
+    if (!list || !list.length) { host.innerHTML = '<div style="color:var(--muted)">No games recorded yet — beat a foe to make your mark.</div>'; return; }
+    host.innerHTML = list.map(function (r) {
+      return '<div><b>' + esc(r.name || 'Challenger') + '</b> beat <b>' + esc(r.opponent || 'a foe') +
+        '</b> <span style="color:#8fe39a">in ' + fmtTime(r.durationMs) + '</span></div>';
+    }).join('');
+  }
+  function renderMsgs(list) {
+    var host = $('msgList');
+    if (!list || !list.length) { host.innerHTML = '<div style="color:var(--muted)">No messages yet — say hello.</div>'; return; }
+    host.innerHTML = list.map(function (m) {
+      return '<div><b style="color:#9fd0ff">' + esc(m.name || 'Anon') + ':</b> ' + esc(m.text) + '</div>';
+    }).join('');
+    host.scrollTop = host.scrollHeight;
+  }
+  function postMessage() {
+    if (!NET.configured()) { alert('Online play is not configured yet (ludus/firebase-config.js), so the message board is offline.'); return; }
+    var t = $('msgInput').value;
+    if (!t.trim()) return;
+    NET.postMessage(NET.playerName() || 'Anon', t);
+    $('msgInput').value = '';
+  }
 
   function init() {
     ui = UI.create({ canvas: $('board'), onAction: onAction, canSelect: function (c) { return !!humanColors[c]; } });
@@ -392,6 +463,16 @@
     // rules modal
     $('btnRules').onclick = function () { $('rulesOverlay').classList.add('open'); };
     $('btnRulesClose').onclick = function () { $('rulesOverlay').classList.remove('open'); };
+
+    // Hall of Records (leaderboard + message board)
+    $('btnBoards').onclick = openBoards;
+    $('btnBoardsClose').onclick = closeBoards;
+    $('boardsSaveName').onclick = function () {
+      NET.setPlayerName($('boardsName').value);
+      $('boardsName').value = NET.playerName();
+    };
+    $('msgSend').onclick = postMessage;
+    $('msgInput').addEventListener('keydown', function (e) { if (e.key === 'Enter') postMessage(); });
 
     // overlay backdrop + Esc close
     document.querySelectorAll('.overlay').forEach(function (ov) {

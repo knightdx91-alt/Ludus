@@ -281,6 +281,34 @@ ok('A and B have distinct client ids', A.clientId() !== B.clientId());
   await A.sweepStale();
   ok('sweep spares a just-created room (grace window)', !!store._root.lobby[fresh.roomId]);
 
+  // --- leaderboard: results are recorded and surface newest-first ---
+  let board = [];
+  const unsubRes = A.onResults(function (r) { board = r; });
+  await A.submitResult({ name: 'Tavi', opponent: 'Antillar Maximus', mode: 'bot', won: true, durationMs: 90000 });
+  await new Promise(function (r) { setTimeout(r, 2); }); // ensure a later timestamp
+  await B.submitResult({ name: 'Kitai', opponent: 'Ehren ex Cursori', mode: 'bot', won: true, durationMs: 120000 });
+  await Promise.resolve();
+  ok('leaderboard records both results', board.length === 2);
+  ok('leaderboard is newest-first', board[0].name === 'Kitai' && board[1].name === 'Tavi');
+  ok('leaderboard keeps duration + opponent', board[1].durationMs === 90000 && board[1].opponent === 'Antillar Maximus');
+  unsubRes();
+
+  // --- message board: posts appear oldest→newest; blanks are dropped ---
+  let msgs = [];
+  const unsubMsg = A.onMessages(function (m) { msgs = m; });
+  await A.postMessage('Max', 'good game!');
+  await new Promise(function (r) { setTimeout(r, 2); });
+  await B.postMessage('Ehren', 'well played');
+  await A.postMessage('Max', '   '); // whitespace-only → ignored
+  await Promise.resolve();
+  ok('message board keeps real posts', msgs.length === 2);
+  ok('message board is oldest-first', msgs[0].text === 'good game!' && msgs[1].text === 'well played');
+  unsubMsg();
+
+  // --- player handle persists per client ---
+  A.setPlayerName('Cursor Ehren');
+  ok('player name round-trips', A.playerName() === 'Cursor Ehren');
+
   console.log(`\n${pass} passed, ${fail} failed`);
   process.exit(fail ? 1 : 0);
 })();

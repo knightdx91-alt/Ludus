@@ -121,7 +121,9 @@ Recommended rules (public reads, writes only by the two seated players + own pre
       }
     },
     "lobby":    { ".read": true, "$id": { ".write": true } },
-    "presence": { ".read": true, "$cid": { ".write": true } }
+    "presence": { ".read": true, "$cid": { ".write": true } },
+    "results":  { ".read": true, "$id": { ".write": true } },
+    "messages": { ".read": true, "$id": { ".write": true } }
   }
 }
 ```

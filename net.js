@@ -305,7 +305,74 @@
     }).then(function () {}).catch(function () {});
   }
 
+  // ---- player handle ---------------------------------------------------
+  // A display name for the leaderboard / message board, kept in localStorage.
+  function playerName() { try { return localStorage.getItem('ludus_name') || ''; } catch (e) { return ''; } }
+  function setPlayerName(n) { try { localStorage.setItem('ludus_name', String(n || '').slice(0, 24)); } catch (e) {} }
+
+  function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+  // ---- leaderboard (results/{id}) --------------------------------------
+  // A public record of finished games: who beat whom, and how fast. We don't
+  // expose orderBy/limit queries (the mock + simplest rules don't need them) —
+  // just read the node and sort/slice client-side.
+  function submitResult(res) {
+    res = res || {};
+    return init().then(function () {
+      return db.ref('results/' + genId()).set({
+        name: String(res.name || 'Challenger').slice(0, 24),
+        opponent: String(res.opponent || '').slice(0, 40),
+        mode: res.mode || 'bot',
+        won: !!res.won,
+        durationMs: res.durationMs || 0,
+        at: Date.now()
+      });
+    }).catch(function () {});
+  }
+  // Subscribe to recent results (newest first). cb(list). Returns unsubscribe fn.
+  function onResults(cb, limit) {
+    limit = limit || 25;
+    var ref = null;
+    init().then(function () {
+      ref = db.ref('results');
+      ref.on('value', function (snap) {
+        var out = [];
+        snap.forEach(function (c) { var r = c.val() || {}; r.id = c.key; out.push(r); });
+        out.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+        cb(out.slice(0, limit));
+      });
+    }).catch(function () {});
+    return function () { if (ref) try { ref.off('value'); } catch (e) {} };
+  }
+
+  // ---- message board (messages/{id}) -----------------------------------
+  function postMessage(name, text) {
+    text = String(text || '').trim().slice(0, 280);
+    if (!text) return Promise.resolve();
+    return init().then(function () {
+      return db.ref('messages/' + genId()).set({ name: String(name || 'Anon').slice(0, 24), text: text, at: Date.now() });
+    }).catch(function () {});
+  }
+  // Subscribe to the message board (oldest→newest, last `limit`). Returns unsub fn.
+  function onMessages(cb, limit) {
+    limit = limit || 50;
+    var ref = null;
+    init().then(function () {
+      ref = db.ref('messages');
+      ref.on('value', function (snap) {
+        var out = [];
+        snap.forEach(function (c) { var m = c.val() || {}; m.id = c.key; out.push(m); });
+        out.sort(function (a, b) { return (a.at || 0) - (b.at || 0); });
+        cb(out.slice(-limit));
+      });
+    }).catch(function () {});
+    return function () { if (ref) try { ref.off('value'); } catch (e) {} };
+  }
+
   window.LudusNet = {
+    playerName: playerName, setPlayerName: setPlayerName,
+    submitResult: submitResult, onResults: onResults,
+    postMessage: postMessage, onMessages: onMessages,
     configured: configured, clientId: clientId,
     createRoom: createRoom, joinRoom: joinRoom, spectate: spectate,
     onState: onState, pushState: pushState,
