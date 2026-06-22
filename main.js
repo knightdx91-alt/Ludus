@@ -15,6 +15,7 @@
     { id: 'bernard', name: 'Bernard', faction: 'Alera', difficulty: 'medium', blurb: 'A steadholder\'s patience — disciplined, defensive, every piece supporting the next.' },
     { id: 'araris', name: 'Araris Valerian', faction: 'Alera', difficulty: 'medium', blurb: 'The peerless blade. Flawless defense, and he guards his lord above all.' },
     { id: 'navaris', name: 'Phrygiar Navaris', faction: 'Alera', difficulty: 'hard', blurb: 'A relentless killer who hunts pieces without mercy or caution.' },
+    { id: 'marcus', name: 'Valiar Marcus', faction: 'Alera', difficulty: 'hard', blurb: 'A veteran First Spear and double-agent — patient, pragmatic, and impossible to bait.' },
     { id: 'tavi', name: 'Tavi', faction: 'Alera', difficulty: 'hard', blurb: 'The finest Ludus mind in the Realm. He sees the endgame from the first move.' },
     { id: 'attis', name: 'Aquitainus Attis', faction: 'Alera', difficulty: 'hard', blurb: 'High Lord Aquitaine — a bold, brilliant commander who seizes the skies and presses hard.' },
     { id: 'invidia', name: 'Invidia Aquitaine', faction: 'Alera', difficulty: 'hard', blurb: 'Cold and patient. She sets traps and lets your own ambition undo you.' },

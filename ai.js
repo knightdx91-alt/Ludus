@@ -47,7 +47,10 @@
     // Phrygiar Navaris — a relentless killer. Hunts pieces and the king, careless of her own.
     navaris:{ sky: 0.5,  advance: 0.045, support: 0.03, danger: 70, ownDanger: 20, jitter: 0.06, furyBias: 0.06 },
     // Doroga — a Marat headman's straightforward might: charges, heedless of his own king.
-    doroga: { sky: 0.3,  advance: 0.05,  support: 0.03, danger: 55, ownDanger: 25, jitter: 0.12, furyBias: 0.03 }
+    doroga: { sky: 0.3,  advance: 0.05,  support: 0.03, danger: 55, ownDanger: 25, jitter: 0.12, furyBias: 0.03 },
+    // Marcus (Fidelias ex Patronus) — veteran First Spear and double-agent. Pragmatic,
+    // patient, efficient; baits and counter-punches, and isn't easily provoked.
+    marcus: { sky: 0.6,  advance: 0.015, support: 0.08, danger: 55, ownDanger: 60, jitter: 0.02, furyBias: 0.06 }
   };
   var DEFAULT = { sky: 0.6, advance: 0.015, support: 0.05, danger: 40, ownDanger: 40, jitter: 0.01, furyBias: 0.03 };
 
@@ -64,10 +67,22 @@
     return (action.type === 'attack' ? w.furyBias : 0) + Math.random() * w.jitter;
   }
 
+  // King safety, applied to a candidate's RESULTING position. ownDanger = fear for
+  // its own First Lord (reckless foes lower it); danger = keenness to hunt the enemy's.
+  // Only checked at the root (it runs move-generation, so it stays out of the deep
+  // search) — which is exactly where the 1-ply medium bot needs it to not blunder.
+  function kingAdjust(state, color, w) {
+    var s = 0;
+    if (E.firstLordAttacked(state, color)) s -= w.ownDanger;
+    if (E.firstLordAttacked(state, E.opp(color))) s += w.danger;
+    return s;
+  }
+
   function greedy(state, color, w) {
     var acts = E.legalActions(state, color), best = null, bestScore = -Infinity;
     for (var i = 0; i < acts.length; i++) {
-      var s = E.evaluate(E.applyAction(state, acts[i]), color, w) + styleScore(acts[i], w);
+      var ns = E.applyAction(state, acts[i]);
+      var s = E.evaluate(ns, color, w) + kingAdjust(ns, color, w) + styleScore(acts[i], w);
       if (s > bestScore) { bestScore = s; best = acts[i]; }
     }
     return best;
@@ -97,7 +112,8 @@
     acts.sort(function (a, b) { return b.targets.length - a.targets.length; });
     var best = null, bestScore = -Infinity, alpha = -Infinity, beta = Infinity;
     for (var i = 0; i < acts.length; i++) {
-      var v = search(E.applyAction(state, acts[i]), color, depth - 1, alpha, beta, w) + styleScore(acts[i], w);
+      var ns = E.applyAction(state, acts[i]);
+      var v = search(ns, color, depth - 1, alpha, beta, w) + kingAdjust(ns, color, w) + styleScore(acts[i], w);
       if (v > bestScore) { bestScore = v; best = acts[i]; }
       if (bestScore > alpha) alpha = bestScore;
     }

@@ -29,7 +29,25 @@
   function forward(color) { return color === 'white' ? -1 : 1; }
   function backRank(color) { return color === 'white' ? 0 : GROUND - 1; } // promotion rank
 
-  function clone(state) { return JSON.parse(JSON.stringify(state)); }
+  // Fast structural clone — far cheaper than JSON round-tripping, and this runs on
+  // every node of the AI search. Knows the exact (flat) shape of a Ludus state.
+  function clone(state) {
+    var ps = state.pieces, n = ps.length, arr = new Array(n);
+    for (var i = 0; i < n; i++) {
+      var p = ps[i];
+      arr[i] = { id: p.id, type: p.type, color: p.color, board: p.board, r: p.r, c: p.c, moved: p.moved };
+    }
+    var ns = { pieces: arr, turn: state.turn, winner: state.winner, moveCount: state.moveCount };
+    var cap = state.captured;
+    if (cap) ns.captured = { white: cloneCaps(cap.white), black: cloneCaps(cap.black) };
+    return ns;
+  }
+  function cloneCaps(list) {
+    if (!list || !list.length) return [];
+    var out = new Array(list.length);
+    for (var i = 0; i < list.length; i++) { var c = list[i]; out[i] = { type: c.type, color: c.color, by: c.by }; }
+    return out;
+  }
 
   function pieceAt(state, board, r, c) {
     for (var i = 0; i < state.pieces.length; i++) {
@@ -247,12 +265,10 @@
     score += w.support * (supportCount(state, color) - supportCount(state, opp(color)));
     // positional: contest the skies + keep advancing (so bots don't just sit back)
     score += positional(state, color, w) - positional(state, opp(color), w);
-    // king safety: a First Lord that can be captured next turn is in grave danger.
-    // (v1 has no "check" legality, so the AI needs this to not hang/blunder its FL.)
-    // ownDanger = how much the bot fears for its own king (reckless foes lower it);
-    // danger = how keenly it hunts the enemy king.
-    if (firstLordAttacked(state, color)) score -= w.ownDanger;
-    if (firstLordAttacked(state, opp(color))) score += w.danger;
+    // NOTE: king safety (firstLordAttacked) is applied by ai.js at the ROOT of each
+    // decision, not here — the deep search already punishes a truly hung First Lord
+    // via the winner term, so keeping this leaf eval free of move-generation keeps
+    // the search fast. The root check is what protects the 1-ply (medium) bot.
     return score;
   }
   // sky occupation + advance-toward-the-enemy nudge. Kept small vs material so the
@@ -305,6 +321,7 @@
     initialState: initialState, legalActions: legalActions, applyAction: applyAction,
     evaluate: evaluate, clone: clone, pieceAt: pieceAt, pieceById: pieceById,
     underSky: underSky, groundToSky: groundToSky, skyToGround: skyToGround,
-    opp: opp, hasFirstLord: hasFirstLord, isAerial: function (t) { return !!AERIAL[t]; }
+    opp: opp, hasFirstLord: hasFirstLord, firstLordAttacked: firstLordAttacked,
+    isAerial: function (t) { return !!AERIAL[t]; }
   };
 })();
