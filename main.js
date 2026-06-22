@@ -9,11 +9,18 @@
   // Opponents from across the Realm. Difficulty maps to the AI strength.
   var OPPONENTS = [
     { id: 'max', name: 'Antillar Maximus', faction: 'Alera', difficulty: 'easy', blurb: 'Brash and fearless — he plays on instinct, not patience.' },
+    { id: 'kord', name: 'Kord', faction: 'Alera', difficulty: 'easy', blurb: 'A brutal slaver — crude, aggressive, and utterly without finesse.' },
+    { id: 'bittan', name: 'Bittan', faction: 'Alera', difficulty: 'easy', blurb: 'Kord\'s cowardly son — he lunges wildly, then loses his nerve.' },
+    { id: 'brencis', name: 'Brencis Minoris', faction: 'Alera', difficulty: 'easy', blurb: 'An arrogant young lordling — overconfident and reckless, he leaves himself open.' },
+    { id: 'frederic', name: 'Frederic', faction: 'Alera', difficulty: 'easy', blurb: 'An earnest young steadholder — brave but green, with simple, honest play.' },
     { id: 'amara', name: 'Amara', faction: 'Alera', difficulty: 'medium', blurb: 'A Cursor on the wing — swift, daring, and always probing for an opening.' },
     { id: 'ehren', name: 'Ehren ex Cursori', faction: 'Alera', difficulty: 'medium', blurb: 'A Cursor\'s careful, clever calculation. Misses little.' },
     { id: 'kitai', name: 'Kitai', faction: 'Alera', difficulty: 'medium', blurb: 'Marat-sharp and endlessly adaptable to your plans.' },
     { id: 'bernard', name: 'Bernard', faction: 'Alera', difficulty: 'medium', blurb: 'A steadholder\'s patience — disciplined, defensive, every piece supporting the next.' },
     { id: 'araris', name: 'Araris Valerian', faction: 'Alera', difficulty: 'medium', blurb: 'The peerless blade. Flawless defense, and he guards his lord above all.' },
+    { id: 'miles', name: 'Sir Miles', faction: 'Alera', difficulty: 'medium', blurb: 'A Legion captain — disciplined and defensive, every piece supporting the next.' },
+    { id: 'crassus', name: 'Antillus Crassus', faction: 'Alera', difficulty: 'medium', blurb: 'A young Knight Commander and gifted flier — balanced, and quick to seize the skies.' },
+    { id: 'isana', name: 'Isana', faction: 'Alera', difficulty: 'medium', blurb: 'A watercrafter\'s patience — protective and deeply defensive; hard to break through.' },
     { id: 'navaris', name: 'Phrygiar Navaris', faction: 'Alera', difficulty: 'hard', blurb: 'A relentless killer who hunts pieces without mercy or caution.' },
     { id: 'marcus', name: 'Valiar Marcus', faction: 'Alera', difficulty: 'hard', blurb: 'A veteran First Spear and double-agent — patient, pragmatic, and impossible to bait.' },
     { id: 'tavi', name: 'Tavi', faction: 'Alera', difficulty: 'hard', blurb: 'The finest Ludus mind in the Realm. He sees the endgame from the first move.' },
@@ -21,6 +28,7 @@
     { id: 'invidia', name: 'Invidia Aquitaine', faction: 'Alera', difficulty: 'hard', blurb: 'Cold and patient. She sets traps and lets your own ambition undo you.' },
     { id: 'gaius', name: 'Gaius Sextus', faction: 'Alera', difficulty: 'hard', blurb: 'The old First Lord — he wins by sacrifice and misdirection, and never stops hunting your king.' },
     { id: 'doroga', name: 'Doroga', faction: 'Marat', difficulty: 'medium', blurb: 'A Marat headman\'s straightforward might — he comes straight at you, heedless of his own safety.' },
+    { id: 'hashat', name: 'Hashat', faction: 'Marat', difficulty: 'medium', blurb: 'A Horse-clan headman — swift and mobile, striking like cavalry and wheeling away.' },
     { id: 'nasaug', name: 'Nasaug', faction: 'Canim', difficulty: 'medium', blurb: 'A Canim battlemaster who never wastes a move.' },
     { id: 'varg', name: 'Warmaster Varg', faction: 'Canim', difficulty: 'hard', blurb: 'Patient, disciplined, and utterly relentless once committed.' },
     { id: 'queen', name: 'The Vord Queen', faction: 'Vord', difficulty: 'hard', blurb: 'Cold, inhuman calculation. She studies you as you play.' }

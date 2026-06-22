@@ -50,7 +50,27 @@
     doroga: { sky: 0.3,  advance: 0.05,  support: 0.03, danger: 55, ownDanger: 25, jitter: 0.12, furyBias: 0.03 },
     // Marcus (Fidelias ex Patronus) — veteran First Spear and double-agent. Pragmatic,
     // patient, efficient; baits and counter-punches, and isn't easily provoked.
-    marcus: { sky: 0.6,  advance: 0.015, support: 0.08, danger: 55, ownDanger: 60, jitter: 0.02, furyBias: 0.06 }
+    marcus: { sky: 0.6,  advance: 0.015, support: 0.08, danger: 55, ownDanger: 60, jitter: 0.02, furyBias: 0.06 },
+
+    // ---- easy: crude, impulsive, or green; they overreach and hang pieces ----
+    // Kord — brutal slaver. Crude aggression, no finesse, heedless of his own king.
+    kord:    { sky: 0.2, advance: 0.05,  support: 0.02, danger: 50, ownDanger: 15, jitter: 0.30, furyBias: 0.02 },
+    // Bittan — Kord's cowardly, impulsive son. Erratic: lunges, then flinches back.
+    bittan:  { sky: 0.2, advance: 0.03,  support: 0.02, danger: 40, ownDanger: 30, jitter: 0.40, furyBias: 0.02 },
+    // Brencis Minoris — arrogant lordling. Overconfident, reckless, leaves himself open.
+    brencis: { sky: 0.5, advance: 0.06,  support: 0.02, danger: 55, ownDanger: 18, jitter: 0.22, furyBias: 0.03 },
+    // Frederic — earnest young steadholder. Brave but green; simple, honest play.
+    frederic:{ sky: 0.3, advance: 0.02,  support: 0.06, danger: 40, ownDanger: 45, jitter: 0.20, furyBias: 0.03 },
+
+    // ---- medium: competent and steady, but not masters ----
+    // Sir Miles — Legion captain. Disciplined, defensive, every piece supporting the next.
+    miles:   { sky: 0.5, advance: 0.015, support: 0.09, danger: 45, ownDanger: 60, jitter: 0.05, furyBias: 0.05 },
+    // Antillus Crassus — young Knight Commander, strong flier. Balanced; seizes the skies.
+    crassus: { sky: 0.95,advance: 0.025, support: 0.05, danger: 48, ownDanger: 48, jitter: 0.06, furyBias: 0.05 },
+    // Hashat — Marat Horse-clan headman. Swift, mobile, cavalry-style aggression.
+    hashat:  { sky: 0.4, advance: 0.045, support: 0.04, danger: 50, ownDanger: 40, jitter: 0.08, furyBias: 0.04 },
+    // Isana — watercrafter healer. Protective, patient, very defensive; hard to break.
+    isana:   { sky: 0.5, advance: 0.006, support: 0.10, danger: 35, ownDanger: 70, jitter: 0.05, furyBias: 0.05 }
   };
   var DEFAULT = { sky: 0.6, advance: 0.015, support: 0.05, danger: 40, ownDanger: 40, jitter: 0.01, furyBias: 0.03 };
 
