@@ -43,7 +43,7 @@
   var net = null, unsub = null, unsubPlayers = null, applying = false, unsubRooms = null;
   var unsubAway = null, awayTimer = null, awayUntil = 0;
   var gameStart = 0, gameRecorded = false;          // for the Hall of Records
-  var unsubLeader = null, unsubMsg = null;
+  var unsubLeader = null, unsubMsg = null, clockTimer = null;
 
   function $(id) { return document.getElementById(id); }
   function setStatus(m) { $('status').textContent = m; }
@@ -167,9 +167,22 @@
     ui.setPerspective(perspective);
     ui.clearSelection();
     gameStart = Date.now(); gameRecorded = false;
+    startClock();
     showScreen('screenGame');
     loop();
   }
+
+  // ---- in-game clock: elapsed time since the game began ----------------
+  function startClock() {
+    stopClock();
+    var el = $('gameClock'); if (el) el.style.display = '';
+    updateClock();
+    clockTimer = setInterval(updateClock, 1000);
+  }
+  function updateClock() {
+    var el = $('gameClock'); if (el && gameStart) el.textContent = '⏱ ' + fmtTime(Date.now() - gameStart);
+  }
+  function stopClock() { if (clockTimer) { clearInterval(clockTimer); clockTimer = null; } }
 
   // First time the player starts a game, ask what to call them (for the Hall of
   // Records). Only asks once — a saved name or a prior decline won't re-prompt.
@@ -201,6 +214,7 @@
     ui.render(state);
     if (state.winner) {
       var youWin = humanColors[state.winner];
+      updateClock(); stopClock();   // freeze the clock at the final time
       recordResult();
       if (mode === 'spectate') setStatus(state.winner.toUpperCase() + ' wins — captured the First Lord.');
       else setStatus((mode === 'hotseat' ? state.winner.toUpperCase() + ' wins' : (youWin ? 'Victory — you' : 'Defeat — your foe') + ' captured the First Lord') + '.');
@@ -316,6 +330,7 @@
     ui.setPerspective('white'); $('btnFlip').dataset.p = 'white';
     $('roomBox').style.display = 'block';
     $('roomCode').textContent = room.roomId; $('roomColor').textContent = 'spectator';
+    stopClock(); var ck = $('gameClock'); if (ck) ck.style.display = 'none'; // not your game
     showScreen('screenGame');
     ui.clearSelection();
     state = E.initialState();
@@ -361,7 +376,7 @@
   function enterOnlineGame(room) {
     net = room; mode = 'online';
     NET.armGame(room.ref, room.color); // a tab that dies mid-game drops only its own seat
-    gameStart = Date.now(); gameRecorded = false;
+    gameStart = Date.now(); gameRecorded = false; startClock();
     $('oppLabel').textContent = 'Online · you are ' + room.color;
     ui.setPerspective(room.color); $('btnFlip').dataset.p = room.color;
     $('roomBox').style.display = 'block';
@@ -470,6 +485,7 @@
 
     // game-screen tools
     $('btnNewGame').onclick = function () {
+      stopClock();
       if (mode === 'online') leaveOnline(); else teardownNet();
       $('roomBox').style.display = 'none';
       showScreen('screenTitle');
