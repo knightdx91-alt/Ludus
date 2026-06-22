@@ -134,6 +134,7 @@
     beginLocal('hotseat', { white: true, black: true }, 'white', 'Pass & Play');
   }
   function beginLocal(m, hc, perspective, label) {
+    ensureName();
     teardownNet();
     net = null; mode = m; humanColors = hc;
     state = E.initialState();
@@ -145,6 +146,18 @@
     gameStart = Date.now(); gameRecorded = false;
     showScreen('screenGame');
     loop();
+  }
+
+  // First time the player starts a game, ask what to call them (for the Hall of
+  // Records). Only asks once — a saved name or a prior decline won't re-prompt.
+  function ensureName() {
+    try {
+      if (NET.playerName()) return;
+      if (localStorage.getItem('ludus_name_asked')) return;
+      localStorage.setItem('ludus_name_asked', '1');
+      var n = window.prompt('What name shall the Realm remember you by?\n(Used for the leaderboard & message board — you can change it later in the Hall.)', '');
+      if (n && n.trim()) NET.setPlayerName(n.trim());
+    } catch (e) {}
   }
 
   // Record a human victory to the shared leaderboard (bot + online games only).
@@ -289,6 +302,7 @@
 
   // CREATE: open a room, sit in the lobby, and start the moment a foe joins.
   function createOnline() {
+    ensureName();
     stopRooms();
     teardownNet();
     $('onlineStatus').textContent = 'Creating room…';
@@ -309,6 +323,7 @@
 
   // JOIN: claim a seat in an existing room and go straight into the game.
   function joinOnline(code) {
+    ensureName();
     stopRooms();
     teardownNet();
     $('onlineStatus').textContent = 'Joining…';
